@@ -7,7 +7,7 @@ https://jobs.apple.com/en-us/details/200686669-0836/camera-and-photos-image-qual
 posted Sep 30 2026). The posting's minimum qualifications ask for automation built with coding
 harnesses like Claude Code, Python/MATLAB, photography knowledge, imaging-pipeline familiarity,
 and ISO image-quality metrics. This repo is the portfolio artifact that turns the one gap (ISO IQ
-metrics) into a demonstrated strength, measured on his own photographs. It was scaffolded
+metrics) into a demonstrated strength, measured on her own photographs. It was scaffolded
 overnight on 2026-10-13 by Claude from a cloud session; Claude Code on this Mac continues it.
 
 Keep that audience in mind: a camera-team engineer will read this code. Prefer correctness,
