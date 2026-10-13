@@ -11,3 +11,4 @@ results_run*.log
 !results/report.md
 !results/results.csv
 !results/charts/
+media/build/
