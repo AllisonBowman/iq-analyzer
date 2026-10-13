@@ -8,14 +8,14 @@ that stands far above both its annulus (the radial envelope) and its neighbourho
 (the local anisotropy).  Thresholds below come from measured distributions:
 
     synthetic negatives (white, pink, Gaussian-smoothed, anisotropic noise,
-    JPEG q50/q75 blocking)                              peak 1.1 .. 3.8
-    28 ordinary library files, four cameras, HEIC+JPEG   peak 1.6 .. 7.1
-    sinusoid at half the noise amplitude, full frame      peak 33
+    JPEG q50/q75 blocking)                              peak 1.0 .. 1.8
+    34 ordinary library files, five cameras, HEIC+JPEG   peak 1.3 .. 3.2
+    sinusoid at half the noise amplitude, full frame      peak 15 .. 48
     noise-strength grid on 11 % of the frame              peak 16
-    the library's screen photo (whiteness 0.12)           peak 41
+    the library's screen photos                           peak 11 .. 127
 
-so ``PERIODIC_PEAK_THRESHOLD`` = 8 sits between every negative and every positive
-with a factor of two to spare on each side.
+so ``PERIODIC_PEAK_THRESHOLD`` = 6 sits between every negative and every positive
+with a factor of 1.9 to spare on each side.
 """
 import numpy as np
 

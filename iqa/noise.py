@@ -23,15 +23,20 @@ Method
    pattern that repeats at one frequency stand out even when a single patch
    cannot show it.  The averaged spectrum is divided by the median of its
    annulus (removing the radial 1/f envelope and the NR roll-off) and then by
-   the median of its 7x7 neighbourhood minus the 3x3 core (removing the
-   axis-aligned ridge demosaicing and JPEG leave behind).  The largest value
-   over bins at radius >= 3 cycles/patch, excluding the two Nyquist-on-axis
-   bins (a 2-pixel alternation every pipeline's sharpening can produce), is
-   ``noise_spectral_peak``.  Pure noise averages to ~1; measured negatives
-   (white, pink, smoothed, anisotropic, JPEG-blocked synthetics; 28 ordinary
-   library files) reach 1.1-7.1; a noise-strength grid on 11 % of the frame
-   reaches 16 and the library's screen photo 41.  Above
-   ``PERIODIC_PEAK_THRESHOLD`` (8) the image is ``noise_periodic_suspect``,
+   the larger of the medians along its row and along its column at offsets
+   2-4 bins (so a ridge along an axis, which demosaicing, JPEG and oriented
+   texture leave behind, scores ~1 while a spot does not).  The largest value
+   over bins at radius >= 3 cycles/patch, excluding the Nyquist row and
+   column (a 2-pixel alternation along either axis, which any pipeline's
+   sampling and sharpening can produce), is ``noise_spectral_peak``.  Pure
+   noise averages to ~1; measured negatives (white, pink, smoothed,
+   anisotropic, JPEG-blocked synthetics; 34 ordinary library files from five
+   cameras, HEIC and JPEG, including the four that a block-median baseline
+   had mis-scored at 8-12) reach 1.0-3.2; a noise-strength grid on 11 % of
+   the frame reaches 16, a half-noise-amplitude sinusoid 15-48, and the
+   library's screen photos 11-127.  Above
+   ``PERIODIC_PEAK_THRESHOLD`` (6, the geometric midpoint of 3.2 and 11.3)
+   the image is ``noise_periodic_suspect``,
    and candidate patches whose own power in the peak's 3x3 bins exceeds four
    times their local baseline are excluded before the noise floor is taken,
    provided they are a minority of the selected patches
@@ -56,6 +61,7 @@ with certainty without a second exposure.
 """
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 
 import cv2
@@ -64,7 +70,7 @@ import numpy as np
 from .imageio import srgb_decode
 
 MIDGREY_8BIT = 118.0   # sRGB encoding of 18 % reflectance
-PERIODIC_PEAK_THRESHOLD = 8.0   # see module docstring, step 3b, for the measured distributions
+PERIODIC_PEAK_THRESHOLD = 6.0   # see module docstring, step 3b, for the measured distributions
 PERIODIC_MIN_RADIUS = 3.0       # cycles per patch; below this the sigma-8 high-pass still shapes the spectrum
 PERIODIC_PATCH_FACTOR = 4.0     # per-patch exclusion: 3x3 peak power vs local baseline (Gamma(9) tail ~1e-6)
 PERIODIC_MAX_EXCLUDED_FRACTION = 0.5   # exclude flagged patches only while they are a minority of the selected set
@@ -91,7 +97,7 @@ class NoiseResult:
     rejection_rate: float = float("nan")       # share of candidate (edge-free, unclipped) patches rejected as texture
     spectral_peak: float = float("nan")        # averaged-spectrum peak over its annular+local baseline (~1 for noise)
     periodic_suspect: bool = False             # spectral_peak > PERIODIC_PEAK_THRESHOLD
-    periodic_freq_cpp: float = float("nan")    # frequency of the peak, cycles/pixel (nan when not flagged)
+    periodic_freq_cpp: float = float("nan")    # radial frequency of the peak, cycles/pixel (nan when not flagged; up to 0.66 on a diagonal)
     periodic_fraction: float = 0.0             # share of candidate patches excluded as periodic
 
     def as_dict(self) -> dict:
@@ -133,18 +139,18 @@ def _annular_baseline(S: np.ndarray, rbin: np.ndarray) -> np.ndarray:
     return np.maximum(B, 1e-12)
 
 
-def _local_baseline(S: np.ndarray, valid: np.ndarray, outer: int = 3, inner: int = 1) -> np.ndarray:
-    """Median of the (2*outer+1)^2 neighbourhood minus the (2*inner+1)^2 core, over valid bins only.
-    The spectrum is periodic in k, so np.roll wraps correctly."""
+def _local_baseline(S: np.ndarray, valid: np.ndarray, lo: int = 2, hi: int = 4) -> np.ndarray:
+    """Directional baseline: the larger of the medians along the row and along the column at
+    offsets lo..hi on both sides, over valid bins only (the spectrum is periodic in k, so np.roll
+    wraps correctly).  A sharp spot stands above both; a ridge along an axis (what demosaicing,
+    JPEG and strongly oriented texture leave behind) is high along one of them and scores ~1."""
     Sm = np.where(valid, S, np.nan)
-    stack = []
-    for dy in range(-outer, outer + 1):
-        for dx in range(-outer, outer + 1):
-            if max(abs(dy), abs(dx)) <= inner:
-                continue
-            stack.append(np.roll(np.roll(Sm, dy, axis=0), dx, axis=1))
-    with np.errstate(all="ignore"):
-        B = np.nanmedian(np.stack(stack), axis=0)
+    offs = list(range(-hi, -lo + 1)) + list(range(lo, hi + 1))
+    with np.errstate(all="ignore"), warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)      # all-NaN slices next to excluded bins
+        rows = np.nanmedian(np.stack([np.roll(Sm, d, axis=1) for d in offs]), axis=0)
+        cols = np.nanmedian(np.stack([np.roll(Sm, d, axis=0) for d in offs]), axis=0)
+    B = np.fmax(rows, cols)
     return np.where(np.isfinite(B) & (B > 0), B, 1e-12)
 
 
@@ -167,8 +173,9 @@ def periodic_texture(resid: np.ndarray, cand_y: np.ndarray, cand_x: np.ndarray, 
     KY, KX = np.meshgrid(k, k, indexing="ij")
     rad = np.sqrt(KY ** 2 + KX ** 2)
     rbin = np.rint(rad).astype(int)
-    nyq_axis = ((np.abs(KY) == half) & (KX == 0)) | ((np.abs(KX) == half) & (KY == 0))
-    valid = (rad >= PERIODIC_MIN_RADIUS) & ~nyq_axis
+    nyq_line = (np.abs(KY) == half) | (np.abs(KX) == half)      # a 2-px alternation along either axis
+    base_valid = (rad >= 2.0) & ~nyq_line                       # the sigma-8 high-pass transmits 99 % at r=2
+    valid = (rad >= PERIODIC_MIN_RADIUS) & ~nyq_line            # where a peak may be declared
     ar = np.arange(N)
 
     def spectra(sl):
@@ -187,8 +194,8 @@ def periodic_texture(resid: np.ndarray, cand_y: np.ndarray, cand_x: np.ndarray, 
     Sbar = acc / M
     A = _annular_baseline(Sbar, rbin)
     R = Sbar / A
-    R = R / _local_baseline(R, valid)
-    Rv = np.where(valid, R, 0.0)
+    R = R / _local_baseline(R, base_valid)
+    Rv = np.where(valid & np.isfinite(R), R, 0.0)
     iy, ix = np.unravel_index(int(np.argmax(Rv)), R.shape)
     peak = float(Rv[iy, ix])
     if not np.isfinite(peak) or peak <= threshold:
@@ -202,7 +209,7 @@ def periodic_texture(resid: np.ndarray, cand_y: np.ndarray, cand_x: np.ndarray, 
         for dy in (-1, 0, 1):
             for dx in (-1, 0, 1):
                 core[(cy + dy) % N, (cx + dx) % N] = True
-    Lb = _local_baseline(Sbar / A, valid)
+    Lb = _local_baseline(Sbar / A, base_valid)
     expected = float((Lb * A)[core].sum())          # what a periodic-free patch would put there
     for i in range(0, M, chunk):
         S = spectra(slice(i, i + chunk))

@@ -42,11 +42,13 @@ def mean_spectrum(resid, cy, cx):
     return acc / cy.size
 
 def normalise(Sbar):
+    """Mirror of iqa.noise.periodic_texture's normalisation."""
     k = np.fft.fftfreq(N) * N; KY, KX = np.meshgrid(k, k, indexing="ij"); rad = np.sqrt(KY ** 2 + KX ** 2)
     rbin = np.rint(rad).astype(int)
-    nyq = ((np.abs(KY) == N // 2) & (KX == 0)) | ((np.abs(KX) == N // 2) & (KY == 0))
-    valid = (rad >= PERIODIC_MIN_RADIUS) & ~nyq
-    R = Sbar / _annular_baseline(Sbar, rbin); R = R / _local_baseline(R, valid)
+    nyq_line = (np.abs(KY) == N // 2) | (np.abs(KX) == N // 2)
+    base_valid = (rad >= 2.0) & ~nyq_line
+    valid = (rad >= PERIODIC_MIN_RADIUS) & ~nyq_line
+    R = Sbar / _annular_baseline(Sbar, rbin); R = R / _local_baseline(R, base_valid)
     return np.where(valid, R, np.nan), valid
 
 def fig_crops_and_spectra():
@@ -58,7 +60,7 @@ def fig_crops_and_spectra():
             j = int(np.flatnonzero(excl)[len(np.flatnonzero(excl)) // 2])
         else:
             j = int(len(cy) // 2)
-        y, x = int(cy[j]), int(cx[j]); s = 96
+        s = 96; y = int(np.clip(cy[j], s, img.shape[0] - s)); x = int(np.clip(cx[j], s, img.shape[1] - s))
         crop = img[y - s:y + s, x - s:x + s]; rcrop = resid[y - s:y + s, x - s:x + s]
         Sbar = mean_spectrum(resid, cy, cx); R, valid = normalise(Sbar)
         panels.append((name, crop, rcrop, Sbar, R, peak, freq, len(cy)))
@@ -83,10 +85,14 @@ def fig_peak_distribution():
         base = os.path.basename(f)[:-4]
         if base.startswith("Sbar_"): continue
         Sbar = np.load(f); R, _ = normalise(Sbar); pk = float(np.nanmax(R))
-        if base.startswith("SYN_"):
+        if base.startswith("B_") or base.startswith("P_"):
+            cat = "ordinary library file" if base.startswith("B_") else "screen photo"
+        elif base.startswith("SYN_"):
             cat = "synthetic negative" if any(base.startswith("SYN_" + k) for k in ("white", "pink", "smooth", "aniso", "jpeg")) else "synthetic positive"
         else:
             cat = "screen photo" if base.startswith("6721B8DA") else "ordinary library file"
+        if base.startswith("B_") or base.startswith("P_"):
+            cat = "ordinary library file" if base.startswith("B_") else "screen photo"
         rows.append((cat, base.replace("SYN_", ""), pk))
     cats = ["synthetic negative", "ordinary library file", "synthetic positive", "screen photo"]
     colors = {"synthetic negative": "#4C78A8", "ordinary library file": "#72B7B2", "synthetic positive": "#F58518", "screen photo": "#E45756"}
@@ -95,9 +101,9 @@ def fig_peak_distribution():
     for i, c in enumerate(cats):
         vals = [pk for cat, _, pk in rows if cat == c]
         ax.scatter(i + rng.uniform(-0.18, 0.18, len(vals)), vals, s=70, color=colors[c], edgecolor="k", linewidth=0.5, zorder=3, label=f"{c} (n={len(vals)})")
-    ax.axhline(PERIODIC_PEAK_THRESHOLD, color="k", ls="--", lw=1.5); ax.text(3.45, PERIODIC_PEAK_THRESHOLD * 1.08, f"threshold = {PERIODIC_PEAK_THRESHOLD:.0f}", ha="right")
+    ax.axhline(PERIODIC_PEAK_THRESHOLD, color="k", ls="--", lw=1.5); ax.text(3.45, PERIODIC_PEAK_THRESHOLD * 1.1, f"threshold = {PERIODIC_PEAK_THRESHOLD:.0f}", ha="right")
     ax.set_yscale("log"); ax.set_xticks(range(len(cats))); ax.set_xticklabels(cats); ax.set_ylabel("spectral peak (1 = noise)")
-    ax.set_title("Where the spectral peak lands: negatives below 8, positives above, with a factor of two each side")
+    ax.set_title("Where the spectral peak lands: negatives below 6, positives above, a factor of 1.9 each side")
     ax.grid(axis="y", alpha=0.3, which="both"); ax.legend(loc="upper left")
     plt.tight_layout(); fig.savefig(os.path.join(OUT, "fig_peaks.png")); plt.close(fig)
     for c in cats:
