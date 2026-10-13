@@ -1,0 +1,9 @@
+numpy>=1.26
+scipy>=1.11
+opencv-python-headless>=4.9
+Pillow>=10.0
+pillow-heif>=0.16
+rawpy>=0.19
+exifread>=3.0
+matplotlib>=3.8
+pytest>=8.0
