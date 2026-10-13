@@ -11,20 +11,39 @@ from scipy.special import erf
 
 def slanted_edge(h: int = 120, w: int = 80, angle_deg: float = 5.0, sigma_px: float = 1.0,
                  low: float = 0.2, high: float = 0.8, noise: float = 0.0,
-                 seed: int = 0) -> np.ndarray:
+                 seed: int = 0, pixel_aperture: bool = False, shading: float = 0.0,
+                 sharpen: float = 0.0, offset_px: float = 0.0) -> np.ndarray:
     """A Gaussian-blurred step edge, running top-to-bottom, tilted ``angle_deg`` from vertical.
 
-    The edge is rendered analytically (ESF = error function), so the exact MTF
-    is ``exp(-2 pi^2 sigma^2 f^2)`` and MTF50 is :func:`iqa.sfr.gaussian_mtf50`.
-    Values are linear intensity in [0, 1].
+    With ``pixel_aperture=False`` the edge is point-sampled from the analytic ESF
+    (error function), so the exact MTF is ``exp(-2 pi^2 sigma^2 f^2)`` and MTF50
+    is :func:`iqa.sfr.gaussian_mtf50`.  With ``pixel_aperture=True`` each pixel
+    integrates the ESF over its 100 %-fill square aperture (8x8 supersampling),
+    which multiplies the MTF by ``sinc(f)`` as a real sensor does:
+    :func:`iqa.sfr.gaussian_pixel_mtf50`.
+
+    ``shading`` adds a linear gradient of that fraction of the step across the
+    ROI width (natural scenes); ``sharpen`` applies unsharp masking of that
+    amount (radius 1 px) to create overshoot; ``offset_px`` moves the edge off
+    the ROI centre.  Values are linear intensity in [0, 1] before shading.
     """
     rng = np.random.default_rng(seed)
-    yy, xx = np.mgrid[0:h, 0:w].astype(np.float64)
     theta = np.radians(angle_deg)
-    x_edge = (w - 1) / 2.0 + np.tan(theta) * (yy - (h - 1) / 2.0)
+    ss = 8 if pixel_aperture else 1
+    yy, xx = np.mgrid[0:h * ss, 0:w * ss].astype(np.float64)
+    yy = (yy + 0.5) / ss - 0.5                     # pixel-centre coordinates
+    xx = (xx + 0.5) / ss - 0.5
+    x_edge = (w - 1) / 2.0 + offset_px + np.tan(theta) * (yy - (h - 1) / 2.0)
     dist = (xx - x_edge) * np.cos(theta)          # signed distance along the normal
     esf = 0.5 * (1.0 + erf(dist / (sigma_px * np.sqrt(2.0))))
+    if ss > 1:
+        esf = esf.reshape(h, ss, w, ss).mean(axis=(1, 3))
     img = low + (high - low) * esf
+    if sharpen > 0:
+        from scipy.ndimage import gaussian_filter
+        img = img + sharpen * (img - gaussian_filter(img, 1.0))
+    if shading != 0.0:
+        img = img + shading * (high - low) * (np.arange(w) - (w - 1) / 2.0) / (w - 1)
     if noise > 0:
         img = img + rng.normal(0.0, noise, img.shape)
     return img

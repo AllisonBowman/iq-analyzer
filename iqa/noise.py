@@ -9,10 +9,13 @@ Method
    removes a negligible fraction of the noise power.
 3. Scan the image with ``patch`` x ``patch`` windows and keep windows that
    contain no Canny edges, are not clipped, and whose residual looks like
-   noise rather than texture: for white noise, smoothing the residual with a
-   sigma-2 Gaussian shrinks its std by ~0.14x, while low-frequency texture
-   survives smoothing.  Windows with a ratio above ``texture_ratio`` are
-   rejected.
+   noise rather than texture: smoothing the residual with a sigma-2 Gaussian
+   shrinks white noise by ~0.14x but leaves low-frequency texture.  Real
+   noise is not white after noise reduction or JPEG compression, so the
+   acceptance threshold adapts to the image: patches are kept when their
+   ratio is below ``max(texture_ratio, 1.3 x the 25th percentile of all
+   candidate ratios)``.  The 25th-percentile ratio is reported as
+   ``noise_whiteness`` (0.14 = white; 0.4+ = heavily correlated / NR'd).
 4. Bin the surviving windows by mean luminance and take a low percentile of
    the residual std in each bin as the noise floor (texture can only *raise*
    the std, so the lower envelope is the best single-frame estimate).
@@ -51,13 +54,23 @@ class NoiseResult:
     dr_stops: dict = field(default_factory=dict)          # {"snr1": .., "snr2": .., "snr4": .., "snr10": ..}
     dr_is_lower_bound: dict = field(default_factory=dict)
     darkest_bin: float = float("nan")
+    snr_midgrey_extrapolated: bool = False      # no flat patches near mid-grey; value is from the nearest bin
+    nearest_bin_level: float = float("nan")
+    noise_whiteness: float = float("nan")      # 25th-pct smoothed/raw residual std ratio (0.14 = white noise)
+    candidate_patches: int = 0
+    rejection_rate: float = float("nan")       # share of candidate (edge-free, unclipped) patches rejected as texture
 
     def as_dict(self) -> dict:
         d = {
             "noise_patches": self.n_patches,
+            "noise_candidate_patches": self.candidate_patches,
+            "noise_rejection_rate": self.rejection_rate,
+            "noise_whiteness": self.noise_whiteness,
             "luma_noise_midgrey_8bit": self.luma_noise_midgrey,
             "chroma_noise_midgrey_8bit": self.chroma_noise_midgrey,
             "snr_midgrey_db": self.snr_midgrey_db,
+            "snr_midgrey_extrapolated": bool(self.snr_midgrey_extrapolated),
+            "snr_nearest_bin_level": self.nearest_bin_level,
         }
         for k, v in self.dr_stops.items():
             d[f"dr_{k}_stops"] = v
@@ -102,8 +115,6 @@ def analyze_noise(rgb8: np.ndarray, patch: int = 32, stride: int = 16, n_bins: i
     g8 = np.clip(Y, 0, 255).astype(np.uint8)
     edges = cv2.Canny(cv2.GaussianBlur(g8, (3, 3), 0), 60, 160)
     edge_density = cv2.blur((edges > 0).astype(np.float32), (patch, patch))
-    mx = cv2.blur(f.max(axis=2), (patch, patch))
-    mn = cv2.blur(f.min(axis=2), (patch, patch))
     clipped_hi = cv2.blur((f.max(axis=2) >= 252).astype(np.float32), (patch, patch))
     clipped_lo = cv2.blur((f.min(axis=2) <= 3).astype(np.float32), (patch, patch))
 
@@ -113,18 +124,22 @@ def analyze_noise(rgb8: np.ndarray, patch: int = 32, stride: int = 16, n_bins: i
     if ys.size == 0 or xs.size == 0:
         return NoiseResult(n_patches=0)
     Yg, Xg = np.meshgrid(ys, xs, indexing="ij")
-    sel = (edge_density[Yg, Xg] == 0) & (clipped_hi[Yg, Xg] == 0) & (clipped_lo[Yg, Xg] == 0)
+    cand = (edge_density[Yg, Xg] == 0) & (clipped_hi[Yg, Xg] == 0) & (clipped_lo[Yg, Xg] == 0)
     sR, sS = stdR[Yg, Xg], stdS[Yg, Xg]
     with np.errstate(invalid="ignore", divide="ignore"):
         ratio = np.where(sR > 1e-6, sS / sR, np.inf)
-    sel &= (ratio < texture_ratio) & (sR > 0.05)
-    del mx, mn
+    cand &= sR > 0.05
+    n_cand = int(cand.sum())
+    whiteness = float(np.percentile(ratio[cand], 25)) if n_cand >= min_patches_per_bin else float("nan")
+    thr = max(texture_ratio, 1.3 * whiteness) if np.isfinite(whiteness) else texture_ratio
+    sel = cand & (ratio < thr)
 
     pm = meanY[Yg, Xg][sel]
     pstd = sR[sel]
     pchroma = np.sqrt(0.5 * (stdRG[Yg, Xg][sel] ** 2 + stdBG[Yg, Xg][sel] ** 2))
     n = int(pm.size)
-    res = NoiseResult(n_patches=n)
+    res = NoiseResult(n_patches=n, candidate_patches=n_cand, noise_whiteness=whiteness,
+                      rejection_rate=float(1.0 - n / n_cand) if n_cand else float("nan"))
     if n < min_patches_per_bin:
         return res
 
@@ -146,14 +161,18 @@ def analyze_noise(rgb8: np.ndarray, patch: int = 32, stride: int = 16, n_bins: i
 
     c, nz = res.bin_centers, res.luma_noise
     lo_c, hi_c = float(c.min()), float(c.max())
-    if lo_c <= MIDGREY_8BIT <= hi_c or len(c) == 1:
+    bin_w = 255.0 / n_bins
+    j = int(np.argmin(np.abs(c - MIDGREY_8BIT)))
+    res.nearest_bin_level = float(c[j])
+    if lo_c - bin_w <= MIDGREY_8BIT <= hi_c + bin_w:
         res.luma_noise_midgrey = float(np.interp(MIDGREY_8BIT, c, nz))
         res.chroma_noise_midgrey = float(np.interp(MIDGREY_8BIT, c, res.chroma_noise))
+        res.snr_midgrey_extrapolated = bool(abs(c[j] - MIDGREY_8BIT) > bin_w)
     else:
-        # extrapolate with the nearest bin (flagged by the caller via n bins if needed)
-        j = int(np.argmin(np.abs(c - MIDGREY_8BIT)))
+        # No flat patches anywhere near mid-grey: report the nearest bin, flagged.
         res.luma_noise_midgrey = float(nz[j])
         res.chroma_noise_midgrey = float(res.chroma_noise[j])
+        res.snr_midgrey_extrapolated = True
     if res.luma_noise_midgrey > 0:
         res.snr_midgrey_db = float(20.0 * np.log10(MIDGREY_8BIT / res.luma_noise_midgrey))
 
@@ -168,18 +187,21 @@ def analyze_noise(rgb8: np.ndarray, patch: int = 32, stride: int = 16, n_bins: i
     res.darkest_bin = lo_c
     for t in (1.0, 2.0, 4.0, 10.0):
         key = f"snr{int(t)}"
-        ok = np.flatnonzero(snr_lin >= t)
-        if ok.size == 0:
+        # Walk down from the brightest bin; the floor is the first bin that fails
+        # the threshold, so a bad mid-tone bin cannot be skipped over.
+        if snr_lin[-1] < t:
             res.dr_stops[key] = float("nan")
             res.dr_is_lower_bound[key] = False
             continue
-        j = int(ok[0])
+        j = len(snr_lin) - 1
+        while j > 0 and snr_lin[j - 1] >= t:
+            j -= 1
         if j == 0:
-            # Already above the threshold in the darkest measured bin: DR is at least this.
+            # Every measured bin passes: the floor is below the darkest flat patch found.
             level = float(lin[0])
             res.dr_is_lower_bound[key] = True
         else:
-            # Interpolate the crossing in log-SNR between bins j-1 and j.
+            # Interpolate the crossing in log-SNR between bins j-1 (fails) and j (passes).
             s0, s1 = np.log(max(snr_lin[j - 1], 1e-9)), np.log(snr_lin[j])
             l0, l1 = np.log(lin[j - 1]), np.log(lin[j])
             frac = (np.log(t) - s0) / (s1 - s0) if s1 != s0 else 0.0

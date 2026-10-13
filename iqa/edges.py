@@ -44,6 +44,15 @@ class EdgeSummary:
     mtf50p_median: float = float("nan")
     rise_median_px: float = float("nan")
     mtf_nyquist_median: float = float("nan")
+    overshoot_median_pct: float = float("nan")
+    mtf50_v_median: float = float("nan")     # edges running top-to-bottom (horizontal resolution)
+    mtf50_h_median: float = float("nan")     # edges running left-to-right (vertical resolution)
+    mtf50_center_median: float = float("nan")   # ROIs within 40 % of the half-diagonal
+    mtf50_outer_median: float = float("nan")    # ROIs beyond 65 % of the half-diagonal
+    n_center: int = 0
+    n_outer: int = 0
+    n_rejected: int = 0
+    reject_reasons: dict = field(default_factory=dict)
     edges: list[EdgeMeasurement] = field(default_factory=list)
 
     def as_dict(self) -> dict:
@@ -56,11 +65,21 @@ class EdgeSummary:
             "mtf50p_median_cpp": self.mtf50p_median,
             "edge_rise_median_px": self.rise_median_px,
             "mtf_nyquist_median": self.mtf_nyquist_median,
+            "overshoot_median_pct": self.overshoot_median_pct,
+            "mtf50_v_median_cpp": self.mtf50_v_median,
+            "mtf50_h_median_cpp": self.mtf50_h_median,
+            "mtf50_center_median_cpp": self.mtf50_center_median,
+            "mtf50_outer_median_cpp": self.mtf50_outer_median,
+            "edges_center": self.n_center,
+            "edges_outer": self.n_outer,
+            "edges_rejected": self.n_rejected,
+            "edges_reject_reasons": ";".join(f"{k}={v}" for k, v in sorted(self.reject_reasons.items())),
         }
 
 
 def _candidate_segments(gray8: np.ndarray, scale: float, min_len_full: int,
-                        min_slant: float, max_slant: float, max_candidates: int):
+                        min_slant: float, max_slant: float, max_candidates: int,
+                        min_sep_px: int = 96):
     small = gray8 if scale >= 1.0 else cv2.resize(gray8, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
     small = cv2.GaussianBlur(small, (0, 0), 2.0)   # detection only; the SFR uses the raw pixels
     edges = cv2.Canny(small, 25, 75)
@@ -87,7 +106,7 @@ def _candidate_segments(gray8: np.ndarray, scale: float, min_len_full: int,
     cands.sort(key=lambda c: -c[0])
     # Non-maximum suppression on segment centres so one long edge is not measured many times.
     kept = []
-    min_sep = 48.0
+    min_sep = float(min_sep_px)
     for c in cands:
         if all(hypot(c[2] - k[2], c[3] - k[3]) > min_sep for k in kept):
             kept.append(c)
@@ -97,19 +116,29 @@ def _candidate_segments(gray8: np.ndarray, scale: float, min_len_full: int,
 
 
 def measure_natural_edges(lin_luma: np.ndarray, max_rois: int = 30, roi_len: int = 96,
-                          roi_across: int = 64, min_contrast: float = 0.20,
-                          det_long_side: int = 1600, min_slant: float = 1.5,
-                          max_slant: float = 12.0, max_candidates: int = 160) -> EdgeSummary:
+                          roi_across: int = 64, min_step: float = 0.04,
+                          max_plateau_noise: float = 0.05, max_shading: float = 0.4,
+                          max_clipped: float = 0.005, det_long_side: int = 1600,
+                          min_slant: float = 1.5, max_slant: float = 12.0,
+                          max_candidates: int = 160) -> EdgeSummary:
     """Detect slanted straight edges and compute the SFR of each.
 
     ``lin_luma`` is scene-linear luminance (float, 0..1) at native resolution.
+
+    An ROI is kept only when its ESF is a valid step: no saturated pixels
+    (clipping inflates MTF50), an absolute step of at least ``min_step`` with
+    plateau residual noise below ``max_plateau_noise`` of the step (edge SNR
+    >= 20), shading below ``max_shading`` of the step after removal, Michelson
+    contrast <= 1, a straight-line fit residual below 0.4 px, and a slant
+    inside 1-16 degrees.  Rejection counts are returned in ``reject_reasons``.
     """
     h, w = lin_luma.shape
     scale = min(1.0, det_long_side / float(max(h, w)))
     gray8 = np.clip(np.power(np.clip(lin_luma, 0.0, 1.0), 1.0 / 2.2) * 255.0, 0, 255).astype(np.uint8)
-    cands = _candidate_segments(gray8, scale, roi_len, min_slant, max_slant, max_candidates)
+    cands = _candidate_segments(gray8, scale, roi_len, min_slant, max_slant, max_candidates, min_sep_px=roi_len)
 
     measured: list[EdgeMeasurement] = []
+    reasons: dict[str, int] = {}
     for length, orient, cx, cy in cands:
         L = int(max(32, min(roi_len, length * 0.9)))
         A = roi_across
@@ -125,20 +154,36 @@ def measure_natural_edges(lin_luma: np.ndarray, max_rois: int = 30, roi_len: int
         try:
             res = compute_sfr(roi)
         except (ValueError, FloatingPointError):
+            reasons["error"] = reasons.get("error", 0) + 1
             continue
-        if not np.isfinite(res.mtf50):
-            continue
-        if res.contrast < min_contrast or res.plateau_noise > 0.15:
-            continue
-        if res.fit_rms_px > 0.4 or not (1.0 <= abs(res.slope_deg) <= 16.0):
-            continue
-        if res.rise_10_90_px > 8.0 or res.mtf50 > 0.6:
+        why = None
+        if res.clipped_frac > max_clipped:
+            why = "clipped"
+        elif not np.isfinite(res.mtf50):
+            why = "no_mtf50_below_nyquist"
+        elif res.contrast > 1.0:
+            why = "contrast_gt_1"
+        elif res.step < min_step:
+            why = "step_too_small"
+        elif res.plateau_noise > max_plateau_noise:
+            why = "plateau_noise"
+        elif res.shading > max_shading:
+            why = "shading"
+        elif res.fit_rms_px > 0.4:
+            why = "fit_residual"
+        elif not (1.0 <= abs(res.slope_deg) <= 16.0):
+            why = "slant"
+        elif not np.isfinite(res.rise_10_90_px) or res.rise_10_90_px > 8.0:
+            why = "rise_width"
+        if why:
+            reasons[why] = reasons.get(why, 0) + 1
             continue
         measured.append(EdgeMeasurement(x0, y0, rw, rh, orient, res))
         if len(measured) >= max_rois:
             break
 
-    summ = EdgeSummary(n_candidates=len(cands), n_measured=len(measured), edges=measured)
+    summ = EdgeSummary(n_candidates=len(cands), n_measured=len(measured), edges=measured,
+                       n_rejected=int(sum(reasons.values())), reject_reasons=reasons)
     if measured:
         m50 = np.array([e.sfr.mtf50 for e in measured])
         summ.mtf50_median = float(np.median(m50))
@@ -146,7 +191,21 @@ def measure_natural_edges(lin_luma: np.ndarray, max_rois: int = 30, roi_len: int
         summ.mtf50_max = float(m50.max())
         summ.mtf50p_median = float(np.median([e.sfr.mtf50p for e in measured]))
         summ.rise_median_px = float(np.median([e.sfr.rise_10_90_px for e in measured]))
-        summ.mtf_nyquist_median = float(np.median([e.sfr.mtf_nyquist for e in measured]))
+        nyq = [e.sfr.mtf_nyquist for e in measured if np.isfinite(e.sfr.mtf_nyquist)]
+        summ.mtf_nyquist_median = float(np.median(nyq)) if nyq else float("nan")
+        summ.overshoot_median_pct = float(np.median([e.sfr.overshoot_pct for e in measured]))
+        v = [e.sfr.mtf50 for e in measured if e.orientation == "v"]
+        hh = [e.sfr.mtf50 for e in measured if e.orientation == "h"]
+        summ.mtf50_v_median = float(np.median(v)) if v else float("nan")
+        summ.mtf50_h_median = float(np.median(hh)) if hh else float("nan")
+        cy0, cx0 = h / 2.0, w / 2.0
+        half_diag = float(np.hypot(cy0, cx0))
+        r = np.array([np.hypot(e.y0 + e.h / 2.0 - cy0, e.x0 + e.w / 2.0 - cx0) / half_diag for e in measured])
+        c = m50[r < 0.40]
+        o = m50[r > 0.65]
+        summ.n_center, summ.n_outer = int(c.size), int(o.size)
+        summ.mtf50_center_median = float(np.median(c)) if c.size else float("nan")
+        summ.mtf50_outer_median = float(np.median(o)) if o.size else float("nan")
     return summ
 
 

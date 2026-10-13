@@ -34,7 +34,10 @@ def test_whole_mtf_curve_matches_gaussian():
     r = compute_sfr(img)
     sel = (r.freq > 0.02) & (r.freq < 0.4)
     expected = np.exp(-2 * np.pi ** 2 * sigma ** 2 * r.freq[sel] ** 2)
-    assert np.max(np.abs(r.mtf[sel] - expected)) < 0.03
+    assert np.max(np.abs(r.mtf[sel] - expected)) < 0.02
+    # Relative accuracy where the curve carries signal (MTF > 0.1): within 5 %.
+    strong = expected > 0.1
+    assert np.max(np.abs(r.mtf[sel][strong] - expected[strong]) / expected[strong]) < 0.05
 
 
 def test_dark_to_bright_and_bright_to_dark_agree():
@@ -47,9 +50,9 @@ def test_dark_to_bright_and_bright_to_dark_agree():
 def test_rise_width_tracks_blur():
     r1 = compute_sfr(slanted_edge(sigma_px=1.0))
     r2 = compute_sfr(slanted_edge(sigma_px=2.0))
-    # 10-90 % rise of a Gaussian ESF is 2.563 sigma.
-    assert abs(r1.rise_10_90_px - 2.563) < 0.5
-    assert abs(r2.rise_10_90_px - 5.126) < 0.7
+    # 10-90 % rise of a Gaussian ESF is 2.563 sigma; 5 % relative.
+    assert abs(r1.rise_10_90_px - 2.563) / 2.563 < 0.05
+    assert abs(r2.rise_10_90_px - 5.126) / 5.126 < 0.05
 
 
 def test_rejects_tiny_roi():

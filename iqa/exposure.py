@@ -16,8 +16,10 @@ class ExposureResult:
     luma_p99: float
     tonal_range_stops: float    # log2 ratio of linear luminance at p99 vs p1
     colorfulness: float         # Hasler & Suesstrunk (2003) metric
-    wb_r_over_g: float          # gray-world ratios; 1.0 = neutral
+    wb_r_over_g: float          # gray-world ratios of *linear* channel means; 1.0 = neutral
     wb_b_over_g: float
+    wb_r_over_g_stops: float    # the same ratios in stops (log2)
+    wb_b_over_g_stops: float
     saturation_mean: float      # HSV-style saturation, 0..1
 
     def as_dict(self) -> dict:
@@ -42,7 +44,10 @@ def analyze_exposure(rgb8: np.ndarray, step: int = 2) -> ExposureResult:
     rg = R - G
     yb = 0.5 * (R + G) - B
     colorfulness = float(np.sqrt(rg.std() ** 2 + yb.std() ** 2) + 0.3 * np.sqrt(rg.mean() ** 2 + yb.mean() ** 2))
-    gmean = max(float(G.mean()), 1e-6)
+    # Gray-world white balance on scene-linear values (encoded ratios understate a cast ~2.4x).
+    lin = srgb_decode(f / 255.0)
+    lr, lg, lb = (float(lin[..., ch].mean()) for ch in range(3))
+    lg = max(lg, 1e-6)
     with np.errstate(divide="ignore", invalid="ignore"):
         sat = np.where(mx > 0, (mx - mn) / np.maximum(mx, 1e-6), 0.0)
     return ExposureResult(
@@ -52,7 +57,9 @@ def analyze_exposure(rgb8: np.ndarray, step: int = 2) -> ExposureResult:
         luma_p1=p1, luma_p50=p50, luma_p99=p99,
         tonal_range_stops=tonal,
         colorfulness=colorfulness,
-        wb_r_over_g=float(R.mean() / gmean),
-        wb_b_over_g=float(B.mean() / gmean),
+        wb_r_over_g=lr / lg,
+        wb_b_over_g=lb / lg,
+        wb_r_over_g_stops=float(np.log2(max(lr, 1e-6) / lg)),
+        wb_b_over_g_stops=float(np.log2(max(lb, 1e-6) / lg)),
         saturation_mean=float(sat.mean()),
     )

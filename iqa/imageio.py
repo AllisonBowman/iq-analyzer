@@ -156,6 +156,32 @@ def _exif_with_exifread(path: str) -> dict:
     return meta
 
 
+def _to_srgb(im: Image.Image) -> tuple[Image.Image, str]:
+    """Convert an image with an embedded ICC profile (Display P3 on most iPhone
+    HEICs, Adobe RGB on many camera JPEGs) to sRGB, so the sRGB linearisation
+    and Rec. 709 luma weights used everywhere else are correct.
+
+    Returns the converted image and a label for the source profile.  An image
+    without a profile is assumed to be sRGB.
+    """
+    icc = im.info.get("icc_profile")
+    if not icc:
+        return im, "assumed-sRGB"
+    try:
+        from io import BytesIO
+        from PIL import ImageCms
+        src = ImageCms.ImageCmsProfile(BytesIO(icc))
+        desc = ImageCms.getProfileDescription(src).strip() or "embedded"
+        if "srgb" in desc.lower():
+            return im, desc
+        dst = ImageCms.createProfile("sRGB")
+        out = ImageCms.profileToProfile(im, src, dst, renderingIntent=ImageCms.Intent.RELATIVE_COLORIMETRIC,
+                                        outputMode="RGB")
+        return out, f"{desc} -> sRGB"
+    except Exception as exc:  # unreadable profile: carry on as sRGB, but say so
+        return im, f"profile-unreadable ({type(exc).__name__}); assumed-sRGB"
+
+
 def _downscale(rgb: np.ndarray, max_side: int | None) -> np.ndarray:
     if not max_side:
         return rgb
@@ -186,6 +212,7 @@ def load_image(path: str, max_side: int | None = None) -> LoadedImage:
         lin = _downscale(lin, max_side)
         rgb8 = np.clip(np.round(srgb_encode(lin) * 255.0), 0, 255).astype(np.uint8)
         meta.update(_exif_with_exifread(path))
+        meta["color_profile"] = "camera -> sRGB (rawpy, linear, camera WB)"
         is_raw = True
     else:
         im = Image.open(path)
@@ -193,6 +220,7 @@ def load_image(path: str, max_side: int | None = None) -> LoadedImage:
         im = ImageOps.exif_transpose(im)
         if im.mode not in ("RGB",):
             im = im.convert("RGB")
+        im, meta["color_profile"] = _to_srgb(im)
         rgb8 = np.asarray(im, dtype=np.uint8)
         rgb8 = _downscale(rgb8, max_side)
         lin = srgb_decode(rgb8.astype(np.float32) / 255.0)
