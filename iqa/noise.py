@@ -16,6 +16,31 @@ Method
    ratio is below ``max(texture_ratio, 1.3 x the 25th percentile of all
    candidate ratios)``.  The 25th-percentile ratio is reported as
    ``noise_whiteness`` (0.14 = white; 0.4+ = heavily correlated / NR'd).
+3b. Periodic texture (screens, fabric, printed halftone) has an amplitude
+   comparable to the noise and a *white-looking* residual, so the ratio gate
+   misses it.  The power spectrum of every candidate patch is normalised to
+   unit mean power and averaged; averaging over thousands of patches makes a
+   pattern that repeats at one frequency stand out even when a single patch
+   cannot show it.  The averaged spectrum is divided by the median of its
+   annulus (removing the radial 1/f envelope and the NR roll-off) and then by
+   the median of its 7x7 neighbourhood minus the 3x3 core (removing the
+   axis-aligned ridge demosaicing and JPEG leave behind).  The largest value
+   over bins at radius >= 3 cycles/patch, excluding the two Nyquist-on-axis
+   bins (a 2-pixel alternation every pipeline's sharpening can produce), is
+   ``noise_spectral_peak``.  Pure noise averages to ~1; measured negatives
+   (white, pink, smoothed, anisotropic, JPEG-blocked synthetics; 28 ordinary
+   library files) reach 1.1-7.1; a noise-strength grid on 11 % of the frame
+   reaches 16 and the library's screen photo 41.  Above
+   ``PERIODIC_PEAK_THRESHOLD`` (8) the image is ``noise_periodic_suspect``,
+   and candidate patches whose own power in the peak's 3x3 bins exceeds four
+   times their local baseline are excluded before the noise floor is taken,
+   provided they are a minority of the selected patches
+   (``noise_periodic_fraction`` is the share of candidates flagged); when most
+   of the selection is the pattern the full selection is kept and only the
+   flag is raised.  When the image is not
+   flagged the selection is exactly the one step 3 produces.  A noise-free
+   gradient quantised to 8 bits is a staircase and is flagged too: its
+   contour lines are periodic.
 4. Bin the surviving windows by mean luminance and take a low percentile of
    the residual std in each bin as the noise floor (texture can only *raise*
    the std, so the lower envelope is the best single-frame estimate).
@@ -39,6 +64,10 @@ import numpy as np
 from .imageio import srgb_decode
 
 MIDGREY_8BIT = 118.0   # sRGB encoding of 18 % reflectance
+PERIODIC_PEAK_THRESHOLD = 8.0   # see module docstring, step 3b, for the measured distributions
+PERIODIC_MIN_RADIUS = 3.0       # cycles per patch; below this the sigma-8 high-pass still shapes the spectrum
+PERIODIC_PATCH_FACTOR = 4.0     # per-patch exclusion: 3x3 peak power vs local baseline (Gamma(9) tail ~1e-6)
+PERIODIC_MAX_EXCLUDED_FRACTION = 0.5   # exclude flagged patches only while they are a minority of the selected set
 
 
 @dataclass
@@ -60,6 +89,10 @@ class NoiseResult:
     texture_suspect: bool = False              # whiteness > 0.7: periodic texture (screens, fabric) or extreme NR, not sensor noise
     candidate_patches: int = 0
     rejection_rate: float = float("nan")       # share of candidate (edge-free, unclipped) patches rejected as texture
+    spectral_peak: float = float("nan")        # averaged-spectrum peak over its annular+local baseline (~1 for noise)
+    periodic_suspect: bool = False             # spectral_peak > PERIODIC_PEAK_THRESHOLD
+    periodic_freq_cpp: float = float("nan")    # frequency of the peak, cycles/pixel (nan when not flagged)
+    periodic_fraction: float = 0.0             # share of candidate patches excluded as periodic
 
     def as_dict(self) -> dict:
         d = {
@@ -68,6 +101,10 @@ class NoiseResult:
             "noise_rejection_rate": self.rejection_rate,
             "noise_whiteness": self.noise_whiteness,
             "noise_texture_suspect": bool(self.texture_suspect),
+            "noise_spectral_peak": self.spectral_peak,
+            "noise_periodic_suspect": bool(self.periodic_suspect),
+            "noise_periodic_freq_cpp": self.periodic_freq_cpp,
+            "noise_periodic_fraction": self.periodic_fraction,
             "luma_noise_midgrey_8bit": self.luma_noise_midgrey,
             "chroma_noise_midgrey_8bit": self.chroma_noise_midgrey,
             "snr_midgrey_db": self.snr_midgrey_db,
@@ -86,6 +123,92 @@ def _local_stats(resid: np.ndarray, patch: int) -> tuple[np.ndarray, np.ndarray]
     m2 = cv2.blur(resid * resid, k)
     var = np.clip(m2 - m * m, 0.0, None)
     return m, np.sqrt(var)
+
+
+def _annular_baseline(S: np.ndarray, rbin: np.ndarray) -> np.ndarray:
+    B = np.ones_like(S)
+    for r in np.unique(rbin):
+        m = rbin == r
+        B[m] = np.median(S[m])
+    return np.maximum(B, 1e-12)
+
+
+def _local_baseline(S: np.ndarray, valid: np.ndarray, outer: int = 3, inner: int = 1) -> np.ndarray:
+    """Median of the (2*outer+1)^2 neighbourhood minus the (2*inner+1)^2 core, over valid bins only.
+    The spectrum is periodic in k, so np.roll wraps correctly."""
+    Sm = np.where(valid, S, np.nan)
+    stack = []
+    for dy in range(-outer, outer + 1):
+        for dx in range(-outer, outer + 1):
+            if max(abs(dy), abs(dx)) <= inner:
+                continue
+            stack.append(np.roll(np.roll(Sm, dy, axis=0), dx, axis=1))
+    with np.errstate(all="ignore"):
+        B = np.nanmedian(np.stack(stack), axis=0)
+    return np.where(np.isfinite(B) & (B > 0), B, 1e-12)
+
+
+def periodic_texture(resid: np.ndarray, cand_y: np.ndarray, cand_x: np.ndarray, patch: int,
+                     threshold: float = PERIODIC_PEAK_THRESHOLD, chunk: int = 2048
+                     ) -> tuple[float, float, np.ndarray]:
+    """Spectral periodic-texture detector over the candidate patches (module docstring, 3b).
+
+    Returns ``(peak, freq_cpp, exclude)``: the normalised peak of the averaged spectrum, the
+    peak's frequency in cycles/pixel (nan when ``peak <= threshold``), and a boolean mask over
+    the candidates marking the patches to exclude (all False when not flagged).
+    """
+    N = patch
+    half = N // 2
+    M = int(cand_y.size)
+    exclude = np.zeros(M, dtype=bool)
+    if M == 0:
+        return float("nan"), float("nan"), exclude
+    k = np.fft.fftfreq(N) * N
+    KY, KX = np.meshgrid(k, k, indexing="ij")
+    rad = np.sqrt(KY ** 2 + KX ** 2)
+    rbin = np.rint(rad).astype(int)
+    nyq_axis = ((np.abs(KY) == half) & (KX == 0)) | ((np.abs(KX) == half) & (KY == 0))
+    valid = (rad >= PERIODIC_MIN_RADIUS) & ~nyq_axis
+    ar = np.arange(N)
+
+    def spectra(sl):
+        yy, xx = cand_y[sl], cand_x[sl]
+        iy = (yy[:, None] - half) + ar[None, :]
+        ix = (xx[:, None] - half) + ar[None, :]
+        P = resid[iy[:, :, None], ix[:, None, :]].astype(np.float32)
+        P -= P.mean(axis=(1, 2), keepdims=True)
+        S = np.abs(np.fft.fft2(P)) ** 2
+        tot = S.sum(axis=(1, 2), keepdims=True) / (N * N)
+        return S / np.maximum(tot, 1e-12)
+
+    acc = np.zeros((N, N), dtype=np.float64)
+    for i in range(0, M, chunk):
+        acc += spectra(slice(i, i + chunk)).sum(axis=0)
+    Sbar = acc / M
+    A = _annular_baseline(Sbar, rbin)
+    R = Sbar / A
+    R = R / _local_baseline(R, valid)
+    Rv = np.where(valid, R, 0.0)
+    iy, ix = np.unravel_index(int(np.argmax(Rv)), R.shape)
+    peak = float(Rv[iy, ix])
+    if not np.isfinite(peak) or peak <= threshold:
+        return peak, float("nan"), exclude
+    freq = float(rad[iy, ix] / N)
+
+    # Per-patch exclusion: power in the 3x3 bins around the peak (and the conjugate peak),
+    # annulus-normalised, against the same bins' local baseline, summed.
+    core = np.zeros((N, N), dtype=bool)
+    for cy, cx in ((iy, ix), ((-iy) % N, (-ix) % N)):
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                core[(cy + dy) % N, (cx + dx) % N] = True
+    Lb = _local_baseline(Sbar / A, valid)
+    expected = float((Lb * A)[core].sum())          # what a periodic-free patch would put there
+    for i in range(0, M, chunk):
+        S = spectra(slice(i, i + chunk))
+        got = S[:, core].sum(axis=1)
+        exclude[i:i + chunk] = got > PERIODIC_PATCH_FACTOR * expected
+    return peak, freq, exclude
 
 
 def analyze_noise(rgb8: np.ndarray, patch: int = 32, stride: int = 16, n_bins: int = 16,
@@ -136,13 +259,29 @@ def analyze_noise(rgb8: np.ndarray, patch: int = 32, stride: int = 16, n_bins: i
     thr = max(texture_ratio, 1.3 * whiteness) if np.isfinite(whiteness) else texture_ratio
     sel = cand & (ratio < thr)
 
+    # Step 3b: periodic texture over the candidate set.
+    cy, cx = Yg[cand], Xg[cand]
+    peak, pfreq, pexcl = periodic_texture(resid, cy, cx, patch)
+    periodic_fraction = float(pexcl.mean()) if pexcl.size else 0.0
+    if pexcl.any():
+        # A pattern on part of the frame (a screen in a room) is excluded so the rest measures
+        # cleanly.  When most of the selected patches are the pattern, the remainder is not
+        # representative: keep the full selection and let the flag speak, as the whiteness flag does.
+        drop = np.zeros_like(sel)
+        drop.flat[np.flatnonzero(cand)[pexcl]] = True
+        n_sel = int(sel.sum())
+        if n_sel and (sel & drop).sum() <= PERIODIC_MAX_EXCLUDED_FRACTION * n_sel:
+            sel &= ~drop
+
     pm = meanY[Yg, Xg][sel]
     pstd = sR[sel]
     pchroma = np.sqrt(0.5 * (stdRG[Yg, Xg][sel] ** 2 + stdBG[Yg, Xg][sel] ** 2))
     n = int(pm.size)
     res = NoiseResult(n_patches=n, candidate_patches=n_cand, noise_whiteness=whiteness,
                       rejection_rate=float(1.0 - n / n_cand) if n_cand else float("nan"),
-                      texture_suspect=bool(np.isfinite(whiteness) and whiteness > 0.7))
+                      texture_suspect=bool(np.isfinite(whiteness) and whiteness > 0.7),
+                      spectral_peak=peak, periodic_suspect=bool(np.isfinite(pfreq)),
+                      periodic_freq_cpp=pfreq, periodic_fraction=periodic_fraction)
     if n < min_patches_per_bin:
         return res
 

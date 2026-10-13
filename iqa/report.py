@@ -18,6 +18,7 @@ CSV_COLUMNS = [
     "mtf50_v_median_cpp", "mtf50_h_median_cpp", "mtf50_center_median_cpp", "mtf50_outer_median_cpp",
     "edges_center", "edges_outer", "edge_rise_median_px", "mtf_nyquist_median", "overshoot_median_pct",
     "noise_patches", "noise_candidate_patches", "noise_rejection_rate", "noise_whiteness", "noise_texture_suspect",
+    "noise_spectral_peak", "noise_periodic_suspect", "noise_periodic_freq_cpp", "noise_periodic_fraction",
     "luma_noise_midgrey_8bit", "chroma_noise_midgrey_8bit", "snr_midgrey_db",
     "snr_midgrey_extrapolated", "snr_nearest_bin_level",
     "dr_snr1_stops", "dr_snr2_stops", "dr_snr4_stops", "dr_snr10_stops",
@@ -81,7 +82,8 @@ def _finite(records, key):
 
 # Rows whose value for a key is a genuine measurement, not an extrapolation or a bound.
 def _noise_ok(r):
-    return not r.get("snr_midgrey_extrapolated") and not r.get("noise_texture_suspect")
+    return (not r.get("snr_midgrey_extrapolated") and not r.get("noise_texture_suspect")
+            and not r.get("noise_periodic_suspect"))
 
 
 def _sharp_ok(r):
@@ -264,7 +266,8 @@ def write_markdown(records: list[dict], charts: list[str], path: str, title: str
     stat("colorfulness", "Colorfulness (Hasler-Suesstrunk)", "{:.1f}")
     lines.append("")
     n_extrap = sum(1 for r in records if r.get("snr_midgrey_extrapolated"))
-    n_tex = sum(1 for r in records if r.get("noise_texture_suspect"))
+    n_tex = sum(1 for r in records if r.get("noise_texture_suspect") or r.get("noise_periodic_suspect"))
+    n_per = sum(1 for r in records if r.get("noise_periodic_suspect"))
     n_dr_lb = sum(1 for r in records if r.get("dr_snr4_lower_bound"))
     n_no_noise = sum(1 for r in records if not r.get("noise_patches"))
     n_sharp = sum(1 for r in records if _sharp_ok(r))
@@ -272,7 +275,7 @@ def write_markdown(records: list[dict], charts: list[str], path: str, title: str
     lines += ["## What was and was not measurable", "",
               f"- Sharpness: usable slanted edges in **{len(with_edges)} of {n}** images, and **{n_sharp}** had the three or more edges needed for a per-image figure (the medians and rankings use only those). Images without edges (open water, sky, bokeh) have no sharpness figure; "
               f"{sum(r.get('edges_rejected', 0) for r in rej)} candidate edges across {len(rej)} images were rejected as clipped, shaded, too noisy, too small a step, or not a step at all (counts per image in the CSV).",
-              f"- Noise: **{n - n_extrap - n_no_noise - n_tex} of {n}** images had flat patches near mid-grey with noise that looks like noise; {n_extrap} report the nearest level instead, {n_tex} are flagged as periodic texture or extreme noise reduction (screens, fabric), and both groups are excluded from the SNR medians and charts; {n_no_noise} had no usable patches.",
+              f"- Noise: **{n - n_extrap - n_no_noise - n_tex} of {n}** images had flat patches near mid-grey with noise that looks like noise; {n_extrap} report the nearest level instead, {n_tex} are flagged as periodic texture or extreme noise reduction (screens, fabric; {n_per} of them by the spectral detector), and both groups are excluded from the SNR medians and charts; {n_no_noise} had no usable patches.",
               f"- Dynamic range: the noise floor was reached in **{n - n_dr_lb} of {n}** images; the other {n_dr_lb} contained no shadows dark enough and give only a lower bound, which is excluded from the DR medians.",
               ""]
 
@@ -312,7 +315,7 @@ def write_markdown(records: list[dict], charts: list[str], path: str, title: str
               "- **MTF50** is the spatial frequency (cycles per pixel, along the edge normal) at which contrast falls to 50 %. Higher is sharper; 0.25-0.35 is very sharp (often sharpened), 0.10-0.15 is soft. Measured on natural slanted edges with the ISO 12233 e-SFR method: a real edge is never a perfect step, so every figure is a scene-dependent *lower bound* on the system MTF, consistent across images of similar subjects but not a chart-grade absolute. The 'sharpest images' ranking compares scenes as much as lenses.",
               "- **In-focus sharpness (p80)** assumes at least a fifth of the measured edges are in the plane of focus; on a shallow-depth-of-field frame with few in-focus edges it reports the background. Check `edges_measured` and `mtf50_max_cpp`.",
               "- **Overshoot** is how far the edge profile overshoots its bright plateau, in % of the step: a direct measure of sharpening halo. MTF50P (relative to the MTF peak) is the sharpening-robust companion of MTF50.",
-              "- **SNR at mid-grey** is 20·log10(118 / noise std) on the 8-bit luminance of flat patches; 35+ dB is clean, below 25 dB is visibly noisy. 8-bit quantisation alone caps it at about 52 dB. The figure is output-referred: noise reduction and JPEG/HEIC compression lower it as much as the sensor does, so SNR-vs-ISO across formats is partly a chart of processing. `noise_whiteness` near 0.14 means white noise; 0.3+ means the noise has been smoothed by NR or compression.",
+              "- **SNR at mid-grey** is 20·log10(118 / noise std) on the 8-bit luminance of flat patches; 35+ dB is clean, below 25 dB is visibly noisy. 8-bit quantisation alone caps it at about 52 dB. The figure is output-referred: noise reduction and JPEG/HEIC compression lower it as much as the sensor does, so SNR-vs-ISO across formats is partly a chart of processing. `noise_whiteness` near 0.14 means white noise; 0.3+ means the noise has been smoothed by NR or compression. `noise_spectral_peak` is how far the strongest frequency in the averaged patch spectrum stands above its surroundings: about 1 for noise, above 8 (`noise_periodic_suspect`) the flat patches contain a repeating pattern (a screen's pixel grid, a weave, halftone) at `noise_periodic_freq_cpp` cycles per pixel, and the SNR is of the pattern, not the sensor.",
               "- **Dynamic range** is output-referred: the stops between near-white and the darkest level whose scene-linear SNR still exceeds the threshold. A JPEG's tone curve bounds it, and the floor can only be found in frames that contain near-black flat areas; 'lower bound' rows are excluded from the medians.",
               "- **Clipping** is the share of pixels at the top (any channel >= 254) or bottom (all channels <= 1) of the range.",
               "- **White balance** is the gray-world ratio of linear channel means (and in stops); it describes the scene's cast as rendered, which for sunsets and underwater work is intent, not error.",
