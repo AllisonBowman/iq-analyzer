@@ -13,7 +13,7 @@ overnight on 2026-10-13 by Claude from a cloud session; Claude Code on this Mac 
 Keep that audience in mind: a camera-team engineer will read this code. Prefer correctness,
 clear method notes with the ISO reference, and validation against ground truth over features.
 
-## State of the project (as of 2026-10-13 ~03:15 ET)
+## State of the project (as of 2026-10-13 09:00 ET)
 
 Done and validated (64 tests pass: `python3 -m pytest -q`):
 - **A first adversarial review ran on this Mac** (`claude -p` with REVIEW_PROMPT.md, output in
@@ -47,10 +47,13 @@ Done and validated (64 tests pass: `python3 -m pytest -q`):
 - `results_demo/` is the synthetic end-to-end run with ground truth printed by `iqa demo`.
 
 Not done yet:
-- **Run on Allison's real photos.** His library is Apple Photos:
-  `~/Pictures/Photos Library.photoslibrary/originals/**` (HEIC/JPEG/DNG). macOS needs a one-time
-  "allow access to Photos" approval for the process that reads it; the overnight session was
-  blocked on that prompt behind the lock screen. See "First task" below.
+- **Real-photo run done (2026-10-13 08:48 ET):** all 389 camera captures in the Photos library
+  (`captures.txt`, built by `python -m iqa.select_captures photo_list.txt captures.txt`), 19 devices,
+  578 s, 0 failures. Outputs in `results/` (report.md, results.csv, charts/, FINDINGS.md). The eye
+  check of five frames led to three new validity gates (not_a_step, noise_texture_suspect, three-edge
+  minimum). Read `results/FINDINGS.md` before touching the metrics: it lists what is and is not
+  trustworthy on this library (screen photos, single-edge frames, DR lower bounds, HEIC/JPEG provenance).
+  Re-render charts without re-analysing: `python -m iqa report results/results.json --title "..."`.
 - No chart mode beyond `iqa sfr --roi` (no automatic ColorChecker / ISO 12233 chart detection).
 - No uncertainty estimates (CI on MTF50 from the per-edge spread would be the first).
 - Not packaged (`pyproject.toml` is minimal); no CI.
@@ -68,7 +71,13 @@ Not done yet:
   review (`claude -p "$(cat REVIEW_PROMPT.md)" --allowedTools Read Grep Glob LS Write
   "Bash(.venv/bin/python:*)"`) after large changes; it costs about $3.5 and 12 minutes.
 
-## First task for Claude Code (the morning prompt)
+## Next task for Claude Code
+
+The morning run is done. The next most valuable step is roadmap item 3 below (chart mode), or a
+spectral periodic-texture detector for the noise module (FINDINGS.md item 1). MORNING_PROMPT.md is
+kept for reference / re-runs.
+
+## The original morning prompt
 
 > Set up the venv, run the tests, then run `python -m iqa analyze` on a 60-image random sample
 > from `~/Pictures/Photos Library.photoslibrary/originals` (recursive, seed 1) into `results/`.
