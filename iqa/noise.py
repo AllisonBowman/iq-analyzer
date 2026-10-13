@@ -57,6 +57,7 @@ class NoiseResult:
     snr_midgrey_extrapolated: bool = False      # no flat patches near mid-grey; value is from the nearest bin
     nearest_bin_level: float = float("nan")
     noise_whiteness: float = float("nan")      # 25th-pct smoothed/raw residual std ratio (0.14 = white noise)
+    texture_suspect: bool = False              # whiteness > 0.7: periodic texture (screens, fabric) or extreme NR, not sensor noise
     candidate_patches: int = 0
     rejection_rate: float = float("nan")       # share of candidate (edge-free, unclipped) patches rejected as texture
 
@@ -66,6 +67,7 @@ class NoiseResult:
             "noise_candidate_patches": self.candidate_patches,
             "noise_rejection_rate": self.rejection_rate,
             "noise_whiteness": self.noise_whiteness,
+            "noise_texture_suspect": bool(self.texture_suspect),
             "luma_noise_midgrey_8bit": self.luma_noise_midgrey,
             "chroma_noise_midgrey_8bit": self.chroma_noise_midgrey,
             "snr_midgrey_db": self.snr_midgrey_db,
@@ -139,7 +141,8 @@ def analyze_noise(rgb8: np.ndarray, patch: int = 32, stride: int = 16, n_bins: i
     pchroma = np.sqrt(0.5 * (stdRG[Yg, Xg][sel] ** 2 + stdBG[Yg, Xg][sel] ** 2))
     n = int(pm.size)
     res = NoiseResult(n_patches=n, candidate_patches=n_cand, noise_whiteness=whiteness,
-                      rejection_rate=float(1.0 - n / n_cand) if n_cand else float("nan"))
+                      rejection_rate=float(1.0 - n / n_cand) if n_cand else float("nan"),
+                      texture_suspect=bool(np.isfinite(whiteness) and whiteness > 0.7))
     if n < min_patches_per_bin:
         return res
 

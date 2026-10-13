@@ -17,7 +17,7 @@ CSV_COLUMNS = [
     "mtf50_median_cpp", "mtf50_p80_cpp", "mtf50_max_cpp", "mtf50p_median_cpp", "mtf50_p80_lwph",
     "mtf50_v_median_cpp", "mtf50_h_median_cpp", "mtf50_center_median_cpp", "mtf50_outer_median_cpp",
     "edges_center", "edges_outer", "edge_rise_median_px", "mtf_nyquist_median", "overshoot_median_pct",
-    "noise_patches", "noise_candidate_patches", "noise_rejection_rate", "noise_whiteness",
+    "noise_patches", "noise_candidate_patches", "noise_rejection_rate", "noise_whiteness", "noise_texture_suspect",
     "luma_noise_midgrey_8bit", "chroma_noise_midgrey_8bit", "snr_midgrey_db",
     "snr_midgrey_extrapolated", "snr_nearest_bin_level",
     "dr_snr1_stops", "dr_snr2_stops", "dr_snr4_stops", "dr_snr10_stops",
@@ -80,10 +80,26 @@ def _finite(records, key):
 
 
 # Rows whose value for a key is a genuine measurement, not an extrapolation or a bound.
+def _noise_ok(r):
+    return not r.get("snr_midgrey_extrapolated") and not r.get("noise_texture_suspect")
+
+
+def _sharp_ok(r):
+    return (r.get("edges_measured") or 0) >= 3
+
+
 VALIDITY = {
-    "snr_midgrey_db": lambda r: not r.get("snr_midgrey_extrapolated"),
-    "luma_noise_midgrey_8bit": lambda r: not r.get("snr_midgrey_extrapolated"),
-    "chroma_noise_midgrey_8bit": lambda r: not r.get("snr_midgrey_extrapolated"),
+    "snr_midgrey_db": _noise_ok,
+    "luma_noise_midgrey_8bit": _noise_ok,
+    "chroma_noise_midgrey_8bit": _noise_ok,
+    "mtf50_p80_cpp": _sharp_ok,
+    "mtf50_median_cpp": _sharp_ok,
+    "mtf50p_median_cpp": _sharp_ok,
+    "mtf50_p80_lwph": _sharp_ok,
+    "mtf50_center_median_cpp": _sharp_ok,
+    "mtf50_outer_median_cpp": _sharp_ok,
+    "overshoot_median_pct": _sharp_ok,
+    "edge_rise_median_px": _sharp_ok,
     "dr_snr1_stops": lambda r: not r.get("dr_snr1_lower_bound"),
     "dr_snr2_stops": lambda r: not r.get("dr_snr2_lower_bound"),
     "dr_snr4_stops": lambda r: not r.get("dr_snr4_lower_bound"),
@@ -151,6 +167,50 @@ def write_charts(records: list[dict], out_dir: str) -> list[str]:
     scatter_vs_iso("mtf50_p80_cpp", "MTF50 (c/px, 80th pct of edges)", "mtf50_vs_iso.png")
     hist("clip_high_pct", "highlight clipping (% of pixels)", "clip_hist.png")
 
+    # Per-camera views: the pooled SNR-vs-ISO cloud hides that phones flatten noise with ISO-dependent NR.
+    cams = {}
+    for r in records:
+        cams.setdefault(r.get("camera_model") or "unknown", []).append(r)
+    top = [c for c, rs in sorted(cams.items(), key=lambda kv: -len(kv[1]))[:5] if len(rs) >= 8]
+    if len(top) >= 2:
+        fig, ax = plt.subplots(figsize=(7.5, 4.4))
+        for cam in top:
+            rs = valid_records(cams[cam], "snr_midgrey_db")
+            pts = [(r["iso"], r["snr_midgrey_db"]) for r in rs
+                   if isinstance(r.get("iso"), (int, float)) and r["iso"] and isinstance(r.get("snr_midgrey_db"), (int, float))
+                   and not math.isnan(r["snr_midgrey_db"])]
+            if len(pts) < 5:
+                continue
+            x, y = zip(*pts)
+            ax.scatter(x, y, s=20, alpha=0.6, label=f"{cam} (n={len(pts)})")
+            # running median in log-ISO bins
+            lx = np.log10(np.array(x)); ly = np.array(y)
+            bins = np.linspace(lx.min(), lx.max(), 7)
+            cx, cy = [], []
+            for b0, b1 in zip(bins[:-1], bins[1:]):
+                m = (lx >= b0) & (lx <= b1)
+                if m.sum() >= 4:
+                    cx.append(10 ** ((b0 + b1) / 2)); cy.append(np.median(ly[m]))
+            if len(cx) >= 2:
+                ax.plot(cx, cy, "-", lw=2, alpha=0.9)
+        ax.set_xscale("log"); ax.set_xlabel("ISO"); ax.set_ylabel("SNR at mid-grey (dB), output-referred")
+        ax.set_title("SNR vs ISO by camera (points) with binned medians (lines)")
+        ax.grid(True, which="both", alpha=0.3); ax.legend(fontsize=8)
+        fig.tight_layout(); p = os.path.join(out_dir, "snr_vs_iso_by_camera.png"); fig.savefig(p, dpi=130); plt.close(fig); made.append(p)
+
+        fig, ax = plt.subplots(figsize=(7.5, 4.4))
+        data, labels = [], []
+        for cam in top:
+            v = _finite(valid_records(cams[cam], "mtf50_p80_lwph"), "mtf50_p80_lwph")
+            if v.size >= 3:
+                data.append(v); labels.append(f"{cam}\n(n={v.size})")
+        if data:
+            ax.boxplot(data, tick_labels=labels, showfliers=True)
+            ax.set_ylabel("in-focus MTF50, line widths / picture height")
+            ax.set_title("Resolution by camera (LW/PH is comparable across sensor sizes; cycles/px is not)")
+            ax.grid(True, axis="y", alpha=0.3)
+            fig.tight_layout(); p = os.path.join(out_dir, "lwph_by_camera.png"); fig.savefig(p, dpi=130); plt.close(fig); made.append(p)
+
     # Noise curves overlay: luminance noise vs. level for every image (a camera's "noise profile").
     curves = [(r["file"], r["_noise"]) for r in records if r.get("_noise") is not None and r["_noise"].bin_centers.size >= 3]
     if curves:
@@ -204,13 +264,15 @@ def write_markdown(records: list[dict], charts: list[str], path: str, title: str
     stat("colorfulness", "Colorfulness (Hasler-Suesstrunk)", "{:.1f}")
     lines.append("")
     n_extrap = sum(1 for r in records if r.get("snr_midgrey_extrapolated"))
+    n_tex = sum(1 for r in records if r.get("noise_texture_suspect"))
     n_dr_lb = sum(1 for r in records if r.get("dr_snr4_lower_bound"))
     n_no_noise = sum(1 for r in records if not r.get("noise_patches"))
+    n_sharp = sum(1 for r in records if _sharp_ok(r))
     rej = [r for r in records if r.get("edges_rejected")]
     lines += ["## What was and was not measurable", "",
-              f"- Sharpness: usable slanted edges in **{len(with_edges)} of {n}** images. Images without them (open water, sky, bokeh) have no sharpness figure; "
-              f"{sum(r.get('edges_rejected', 0) for r in rej)} candidate edges across {len(rej)} images were rejected as clipped, shaded, too noisy, or too small a step (counts per image in the CSV).",
-              f"- Noise: **{n - n_extrap - n_no_noise} of {n}** images had flat patches near mid-grey; {n_extrap} report the nearest level instead and are excluded from the SNR medians and charts; {n_no_noise} had no usable patches.",
+              f"- Sharpness: usable slanted edges in **{len(with_edges)} of {n}** images, and **{n_sharp}** had the three or more edges needed for a per-image figure (the medians and rankings use only those). Images without edges (open water, sky, bokeh) have no sharpness figure; "
+              f"{sum(r.get('edges_rejected', 0) for r in rej)} candidate edges across {len(rej)} images were rejected as clipped, shaded, too noisy, too small a step, or not a step at all (counts per image in the CSV).",
+              f"- Noise: **{n - n_extrap - n_no_noise - n_tex} of {n}** images had flat patches near mid-grey with noise that looks like noise; {n_extrap} report the nearest level instead, {n_tex} are flagged as periodic texture or extreme noise reduction (screens, fabric), and both groups are excluded from the SNR medians and charts; {n_no_noise} had no usable patches.",
               f"- Dynamic range: the noise floor was reached in **{n - n_dr_lb} of {n}** images; the other {n_dr_lb} contained no shadows dark enough and give only a lower bound, which is excluded from the DR medians.",
               ""]
 

@@ -10,7 +10,7 @@ from .imageio import LoadedImage, load_image
 from .noise import analyze_noise
 
 META_KEYS = ("format", "camera_make", "camera_model", "lens", "iso", "exposure_s",
-             "f_number", "focal_mm", "datetime", "width", "height")
+             "f_number", "focal_mm", "datetime", "width", "height", "color_profile")
 
 
 def analyze_loaded(img: LoadedImage, max_rois: int = 30) -> dict:

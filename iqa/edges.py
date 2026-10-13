@@ -175,6 +175,10 @@ def measure_natural_edges(lin_luma: np.ndarray, max_rois: int = 30, roi_len: int
             why = "slant"
         elif not np.isfinite(res.rise_10_90_px) or res.rise_10_90_px > 8.0:
             why = "rise_width"
+        elif not (0.16 <= res.mtf50 * res.rise_10_90_px <= 1.2):
+            # A step edge has MTF50 x (10-90 % rise) ~ 0.48 (Gaussian); sharpening raises it a little.
+            # Far outside that band the ROI is not a step (a thin line, a double edge, a texture).
+            why = "not_a_step"
         if why:
             reasons[why] = reasons.get(why, 0) + 1
             continue

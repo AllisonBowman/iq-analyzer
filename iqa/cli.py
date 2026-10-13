@@ -35,6 +35,10 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     from .report import write_charts, write_csv, write_json, write_markdown
 
     files = _collect(args.paths, args.recursive)
+    if args.list:
+        with open(args.list) as fh:
+            files += [ln.strip() for ln in fh if ln.strip() and is_image_file(ln.strip())]
+        files = sorted(set(files))
     if not files:
         print("no image files found", file=sys.stderr)
         return 2
@@ -114,7 +118,7 @@ def cmd_demo(args: argparse.Namespace) -> int:
         p = os.path.join(src, f"scene_sigma{sigma}_noise{noise}.png")
         Image.fromarray(rgb).save(p)
         truth.append((os.path.basename(p), gaussian_mtf50(sigma), noise * 0.75))  # luma noise = 0.75 * per-channel
-    ns = argparse.Namespace(paths=[src], out=args.out, sample=0, seed=0, recursive=False,
+    ns = argparse.Namespace(paths=[src], list=None, out=args.out, sample=0, seed=0, recursive=False,
                             max_rois=30, max_side=None, title="iqa demo on synthetic scenes")
     rc = cmd_analyze(ns)
     print("\nground truth:  file | expected MTF50 | expected luma noise (8-bit)")
@@ -123,13 +127,40 @@ def cmd_demo(args: argparse.Namespace) -> int:
     return rc
 
 
+def cmd_report(args: argparse.Namespace) -> int:
+    """Rebuild charts and report.md from an existing results.json without re-analysing."""
+    import json
+    import numpy as np
+    from .noise import NoiseResult
+    from .report import write_charts, write_csv, write_markdown
+
+    with open(args.json) as fh:
+        records = json.load(fh)
+    for r in records:
+        nc = r.pop("noise_curve", None)
+        r.pop("edges", None)
+        if nc:
+            n = NoiseResult(n_patches=r.get("noise_patches", 0))
+            n.bin_centers = np.array(nc["luma_8bit"]); n.luma_noise = np.array(nc["luma_noise_8bit"])
+            n.chroma_noise = np.array(nc["chroma_noise_8bit"]); n.bin_counts = np.array(nc["patches"])
+            r["_noise"] = n
+    out = args.out or os.path.dirname(os.path.abspath(args.json))
+    os.makedirs(out, exist_ok=True)
+    write_csv(records, os.path.join(out, "results.csv"))
+    charts = write_charts(records, os.path.join(out, "charts"))
+    write_markdown(records, charts, os.path.join(out, "report.md"), title=args.title)
+    print(f"rebuilt {len(charts)} charts and report.md in {out} from {len(records)} records")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="iqa", description="Image-quality analysis of real photographs.")
     ap.add_argument("--version", action="version", version=f"iqa {__version__}")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     a = sub.add_parser("analyze", help="analyse a folder or files; writes CSV, JSON, charts and a report")
-    a.add_argument("paths", nargs="+")
+    a.add_argument("paths", nargs="*")
+    a.add_argument("--list", default=None, help="text file with one image path per line (added to PATHS)")
     a.add_argument("--out", default="results")
     a.add_argument("--sample", type=int, default=0, help="random sample of N files (0 = all)")
     a.add_argument("--seed", type=int, default=1)
@@ -145,6 +176,12 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--horizontal", action="store_true", help="the edge runs left-to-right")
     s.add_argument("--plot", default=None, help="write an ESF/MTF plot to this PNG")
     s.set_defaults(func=cmd_sfr)
+
+    rp = sub.add_parser("report", help="rebuild charts and report.md from results.json without re-analysing")
+    rp.add_argument("json")
+    rp.add_argument("--out", default=None)
+    rp.add_argument("--title", default="Image quality report")
+    rp.set_defaults(func=cmd_report)
 
     d = sub.add_parser("demo", help="synthetic end-to-end run with known ground truth")
     d.add_argument("--out", default="results_demo")

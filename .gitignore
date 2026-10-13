@@ -1,6 +1,13 @@
 .venv/
 __pycache__/
 *.pyc
-results/
+results/*
 photo_list.txt
 .DS_Store
+captures.txt
+results_run*.log
+!results/
+!results/FINDINGS.md
+!results/report.md
+!results/results.csv
+!results/charts/
