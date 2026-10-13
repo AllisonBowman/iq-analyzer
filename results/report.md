@@ -1,6 +1,6 @@
-# Allison's Photos library: all 389 camera captures (19 devices)
+# Allison's Photos library, all 389 camera captures
 
-Generated 2026-10-13 08:56 by iqa on 389 images.
+Generated 2026-10-13 14:08 by iqa on 389 images.
 
 ## Summary
 
@@ -12,9 +12,9 @@ Generated 2026-10-13 08:56 by iqa on 389 images.
 | Outer-frame MTF50 (cycles/px) | 0.179 | 0.070 | 0.447 | 50 |
 | Edge overshoot / sharpening halo (% of step) | 12.0 | 0.0 | 60.9 | 73 |
 | Edge 10-90 % rise (px) | 2.14 | 0.74 | 6.96 | 73 |
-| SNR at mid-grey (dB) | 34.3 | 20.8 | 50.5 | 343 |
-| Luma noise at mid-grey (8-bit std) | 2.27 | 0.35 | 10.79 | 343 |
-| Chroma noise at mid-grey (8-bit std) | 0.54 | 0.00 | 3.01 | 343 |
+| SNR at mid-grey (dB) | 34.5 | 21.3 | 50.5 | 337 |
+| Luma noise at mid-grey (8-bit std) | 2.23 | 0.35 | 10.11 | 337 |
+| Chroma noise at mid-grey (8-bit std) | 0.54 | 0.00 | 2.09 | 337 |
 | Dynamic range @ SNR 4 (stops, output-referred) | 6.3 | 2.3 | 8.6 | 72 |
 | Highlight clipping (% pixels) | 0.73 | 0.00 | 15.60 | 389 |
 | Shadow clipping (% pixels) | 0.02 | 0.00 | 16.66 | 389 |
@@ -24,7 +24,7 @@ Generated 2026-10-13 08:56 by iqa on 389 images.
 ## What was and was not measurable
 
 - Sharpness: usable slanted edges in **149 of 389** images, and **73** had the three or more edges needed for a per-image figure (the medians and rankings use only those). Images without edges (open water, sky, bokeh) have no sharpness figure; 15162 candidate edges across 382 images were rejected as clipped, shaded, too noisy, too small a step, or not a step at all (counts per image in the CSV).
-- Noise: **343 of 389** images had flat patches near mid-grey with noise that looks like noise; 25 report the nearest level instead, 21 are flagged as periodic texture or extreme noise reduction (screens, fabric), and both groups are excluded from the SNR medians and charts; 0 had no usable patches.
+- Noise: **337 of 389** images had flat patches near mid-grey with noise that looks like noise; 25 report the nearest level instead, 27 are flagged as periodic texture or extreme noise reduction (screens, fabric; 6 of them by the spectral detector), and both groups are excluded from the SNR medians and charts; 0 had no usable patches.
 - Dynamic range: the noise floor was reached in **72 of 389** images; the other 317 contained no shadows dark enough and give only a lower bound, which is excluded from the DR medians.
 
 ## Sharpest images (MTF50, 80th percentile of edges)
@@ -61,11 +61,11 @@ Generated 2026-10-13 08:56 by iqa on 389 images.
 
 | file | SNR dB | camera | ISO |
 | --- | --- | --- | --- |
-| 9AE754E4-577A-4BFD-AE33-FD907B924100.jpeg | 20.8 | iPhone 17 Pro Max | 64.0 |
-| 6721B8DA-E5D3-4B54-B807-8DB95C9B4FCE.jpeg | 21.1 | iPhone 17 Pro Max | 125.0 |
 | 0C9BD7A9-33B8-4269-8D35-FFB258CB0CA3.jpeg | 21.3 | iPhone 17 Pro Max | 64.0 |
 | F8202BF2-F8FF-463C-8F55-4DE51193EC24.jpeg | 21.6 | iPhone 17 Pro Max | 1600.0 |
 | 0F01875A-6B06-4A69-8391-7B95C28EC827.heic | 21.8 | iPhone 17 Pro Max | 80.0 |
+| F1E95723-8568-4DC7-AC8C-4875B0E686D8.jpeg | 21.9 | iPhone 13 | 32.0 |
+| 6C27D938-35EB-41B1-AA36-BB28C8AA3880.jpeg | 22.3 | iPhone 17 Pro Max | 64.0 |
 
 ## Most highlight clipping
 
@@ -81,10 +81,10 @@ Generated 2026-10-13 08:56 by iqa on 389 images.
 
 | camera | images | MTF50 p80 median (n) | SNR mid-grey dB median (n) | DR@SNR4 stops median (n) |
 | --- | --- | --- | --- | --- |
-| iPhone 17 Pro Max | 206 | 0.252 (43) | 34.2 (172) | 7.2 (36) |
+| iPhone 17 Pro Max | 206 | 0.252 (43) | 34.5 (167) | 7.2 (36) |
 | iPhone 13 | 85 | 0.308 (20) | 33.0 (79) | 6.4 (17) |
 | NIKON D850 | 36 | 0.391 (1) | 36.5 (33) | 3.9 (1) |
-| iPhone XR | 21 | 0.279 (3) | 33.5 (20) | 5.8 (10) |
+| iPhone XR | 21 | 0.279 (3) | 33.6 (19) | 5.8 (10) |
 | iPhone 6 Plus | 8 | - (0) | 38.1 (8) | 6.6 (2) |
 | iPhone 12 mini | 8 | 0.208 (1) | 31.6 (8) | 5.7 (3) |
 | iPhone 6 | 6 | - (0) | 37.1 (4) | - (0) |
@@ -128,7 +128,7 @@ Generated 2026-10-13 08:56 by iqa on 389 images.
 - **MTF50** is the spatial frequency (cycles per pixel, along the edge normal) at which contrast falls to 50 %. Higher is sharper; 0.25-0.35 is very sharp (often sharpened), 0.10-0.15 is soft. Measured on natural slanted edges with the ISO 12233 e-SFR method: a real edge is never a perfect step, so every figure is a scene-dependent *lower bound* on the system MTF, consistent across images of similar subjects but not a chart-grade absolute. The 'sharpest images' ranking compares scenes as much as lenses.
 - **In-focus sharpness (p80)** assumes at least a fifth of the measured edges are in the plane of focus; on a shallow-depth-of-field frame with few in-focus edges it reports the background. Check `edges_measured` and `mtf50_max_cpp`.
 - **Overshoot** is how far the edge profile overshoots its bright plateau, in % of the step: a direct measure of sharpening halo. MTF50P (relative to the MTF peak) is the sharpening-robust companion of MTF50.
-- **SNR at mid-grey** is 20·log10(118 / noise std) on the 8-bit luminance of flat patches; 35+ dB is clean, below 25 dB is visibly noisy. 8-bit quantisation alone caps it at about 52 dB. The figure is output-referred: noise reduction and JPEG/HEIC compression lower it as much as the sensor does, so SNR-vs-ISO across formats is partly a chart of processing. `noise_whiteness` near 0.14 means white noise; 0.3+ means the noise has been smoothed by NR or compression.
+- **SNR at mid-grey** is 20·log10(118 / noise std) on the 8-bit luminance of flat patches; 35+ dB is clean, below 25 dB is visibly noisy. 8-bit quantisation alone caps it at about 52 dB. The figure is output-referred: noise reduction and JPEG/HEIC compression lower it as much as the sensor does, so SNR-vs-ISO across formats is partly a chart of processing. `noise_whiteness` near 0.14 means white noise; 0.3+ means the noise has been smoothed by NR or compression. `noise_spectral_peak` is how far the strongest frequency in the averaged patch spectrum stands above its surroundings: about 1 for noise, above 8 (`noise_periodic_suspect`) the flat patches contain a repeating pattern (a screen's pixel grid, a weave, halftone) at `noise_periodic_freq_cpp` cycles per pixel, and the SNR is of the pattern, not the sensor.
 - **Dynamic range** is output-referred: the stops between near-white and the darkest level whose scene-linear SNR still exceeds the threshold. A JPEG's tone curve bounds it, and the floor can only be found in frames that contain near-black flat areas; 'lower bound' rows are excluded from the medians.
 - **Clipping** is the share of pixels at the top (any channel >= 254) or bottom (all channels <= 1) of the range.
 - **White balance** is the gray-world ratio of linear channel means (and in stops); it describes the scene's cast as rendered, which for sunsets and underwater work is intent, not error.

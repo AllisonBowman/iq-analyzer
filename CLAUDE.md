@@ -13,9 +13,9 @@ overnight on 2026-10-13 by Claude from a cloud session; Claude Code on this Mac 
 Keep that audience in mind: a camera-team engineer will read this code. Prefer correctness,
 clear method notes with the ISO reference, and validation against ground truth over features.
 
-## State of the project (as of 2026-10-13 09:00 ET)
+## State of the project (as of 2026-10-13 14:15 ET)
 
-Done and validated (64 tests pass: `python3 -m pytest -q`):
+Done and validated (73 tests pass: `python3 -m pytest -q`):
 - **A first adversarial review ran on this Mac** (`claude -p` with REVIEW_PROMPT.md, output in
   `REVIEW.md`, 12 min). It found 13 correctness issues and 13 methodology caveats. Fixed the same
   night, each pinned by a test in `tests/test_adversarial.py`: clipped plateaus now rejected
@@ -39,7 +39,11 @@ Done and validated (64 tests pass: `python3 -m pytest -q`):
   quality filters on contrast / plateau flatness / fit residual / rise width).
 - `iqa/noise.py` flat-patch noise with gradient removal, adaptive texture rejection
   (smoothed-residual ratio below max(0.30, 1.3 x the image's own 25th percentile), reported as
-  `noise_whiteness`), lower-envelope noise floor per brightness bin, SNR at mid-grey (sRGB 118,
+  `noise_whiteness`), **the spectral periodic-texture detector** (`periodic_texture`: averaged
+  unit-power patch spectra, annular then directional baseline, threshold 6; `noise_spectral_peak`,
+  `noise_periodic_suspect`, minority-rule exclusion; nine tests in `tests/test_periodic.py`; the
+  method, the measured distributions and the four false positives that shaped it are in the module
+  docstring and FINDINGS.md section 5 item 1), lower-envelope noise floor per brightness bin, SNR at mid-grey (sRGB 118,
   flagged when extrapolated), chroma noise, output-referred DR at SNR 1/2/4/10 with lower-bound
   flags.
 - `iqa/exposure.py`, `iqa/imageio.py` (RAW via rawpy, HEIC via pillow-heif, EXIF via Pillow +
@@ -73,9 +77,12 @@ Not done yet:
 
 ## Next task for Claude Code
 
-The morning run is done. The next most valuable step is roadmap item 3 below (chart mode), or a
-spectral periodic-texture detector for the noise module (FINDINGS.md item 1). MORNING_PROMPT.md is
-kept for reference / re-runs.
+The morning run and the periodic-texture detector are done (second full run 2026-10-13 13:56 ET).
+Next, in Allison's priority order: strip the `path` column from results.csv and add `--no-paths`
+so the repo can go public; chart mode (roadmap item 3); a bootstrap CI on per-image MTF50 from the
+per-edge spread. MORNING_PROMPT.md is kept for reference / re-runs. `media/make_explainer.py`
+builds the narrated explainer video (run `media/figures.py` first; `say` and pip need the Claude
+Code sandbox off).
 
 ## The original morning prompt
 

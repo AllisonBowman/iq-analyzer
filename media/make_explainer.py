@@ -122,7 +122,8 @@ SLIDES = [
   "A pattern that repeats at one frequency adds coherently; noise averages to a flat 1",
   "Screen photo: two bright spots at plus and minus 0.25 cycles per pixel, a 4-pixel stripe period",
   "Nikon D850 water: a smooth radial blob, nothing sharp",
-  "Per-image cost about one second; 6,597 patches on the screen photo, 50,895 on the D850 frame"],
+  "Per-image cost about one second; 6,597 patches on the screen photo, 50,895 on the D850 frame",
+  "Normalised peak: 15 for the screen, 2.3 for the Nikon, threshold 6"],
  os.path.join(ASSETS, "fig_crops_spectra.png"),
  "Here is what it does, with the two real files. The top row is the screen photo, the bottom row the Nikon. "
  "The first column is a crop; the second is the residual the estimator actually sees, and you can already make "
@@ -131,14 +132,15 @@ SLIDES = [
  "patch cannot reliably see a pattern whose power is a fraction of the noise, but the pattern sits at the same "
  "frequency in every patch, so it adds coherently, while the noise averages toward a flat one. The screen photo "
  "shows two bright spots at plus and minus a quarter cycle per pixel, a four-pixel stripe period. The Nikon frame "
- "is a smooth radial blob. The fourth column is the normalised peak statistic: forty-one for the screen, two "
- "point three for the Nikon, against a threshold of eight."),
+ "is a smooth radial blob. The fourth column is the normalised peak statistic: fifteen for the screen, two "
+ "point three for the Nikon, against a threshold of six."),
 
-("Three things that did not work, and the fix",
+("Four things that did not work, and the fix",
  ["Max over median of all bins: explodes on noise-reduced images, because the high-frequency median is near zero. Smoothed noise scored 430,000",
   "Annular median only: every ordinary file peaked at exactly Nyquist on an axis, up to 9x. Demosaicing and JPEG make the spectrum stronger along the axes than the diagonals; a ridge is not a peak",
   "Local neighbourhood only: every file peaked at the lowest valid radius, the 1/f slope of natural texture against a flatter neighbourhood",
-  "Fix: divide by the annulus median (removes the radial envelope), then by the 7x7 neighbourhood median minus the 3x3 core (removes the ridge). Only a sharp spot survives both"],
+  "Annulus then 7x7 block median: good on 28 files, but the full library produced four false positives at 8 to 12: a D850 water frame with a vertical-axis ridge at the lowest radius, a compact camera with demosaic energy on the Nyquist row and column, two iPhones with axis ridges next to Nyquist",
+  "Fix: divide by the annulus median (radial envelope), then by the larger of the row and column medians at 2 to 4 bins (a ridge is high along one axis, a spot along neither); exclude the whole Nyquist row and column. Only a sharp spot survives"],
  None,
  "This slide is the part an interviewer will care about most, because it shows judgment. The obvious statistic, "
  "the maximum over the median of all spectral bins, exploded on noise-reduced images: the high-frequency median is "
@@ -147,25 +149,30 @@ SLIDES = [
  "included. That is not periodicity; demosaicing and JPEG quantisation leave more power along the axes than along "
  "the diagonals, and the annulus median under-estimates axis bins. A ridge is not a peak. Normalising by the local "
  "neighbourhood instead failed differently: every file peaked at the lowest valid radius, which is just the one "
- "over f slope of natural texture against a flatter neighbourhood. The fix is two stages: divide by the annular "
- "median to flatten the radial envelope, then by the median of the seven by seven neighbourhood with the three "
- "by three core removed, to flatten the ridge. Only a sharp spot survives both."),
+ "over f slope of natural texture against a flatter neighbourhood. Combining the annulus with a seven by seven block "
+ "median looked right on twenty-eight files, and then the full library produced four false positives between eight "
+ "and twelve. Looking at them was the whole job: a D eight fifty water frame with a vertical ridge at the lowest "
+ "searched radius, a compact camera with demosaic energy on the Nyquist row and column, and two iPhones with axis "
+ "ridges next to Nyquist. A block median cannot tell a ridge from a spot. A directional one can: divide by the larger "
+ "of the row median and the column median at two to four bins away. A ridge is high along one axis and scores about "
+ "one; a spot is high along neither. Exclude the whole Nyquist row and column, and only a sharp spot survives."),
 
 ("Threshold from measured distributions, not a guess",
- ["Synthetic negatives (white, pink, smoothed, anisotropic noise, JPEG q50 and q75 blocking): 1.1 to 3.8",
-  "28 ordinary library files, four cameras, HEIC and JPEG: 1.6 to 7.1",
-  "Half-noise-amplitude sinusoid, full frame: 33. Noise-strength grid on 11 % of the frame: 16. The screen photo: 41",
-  "Threshold 8 sits between every negative and every positive with a factor of two to spare on each side",
-  "Two excluded bins: radius below 3 cycles per patch (the high-pass still shapes it) and Nyquist-on-axis (a 2-pixel alternation any sharpening can produce)"],
+ ["Synthetic negatives (white, pink, smoothed, anisotropic noise, JPEG q50 and q75 blocking): 1.0 to 1.8",
+  "34 ordinary library files, five cameras, HEIC and JPEG, including the four former false positives: 1.3 to 3.2",
+  "Half-noise-amplitude sinusoids: 15 to 48. Noise-strength grid on 11 % of the frame: 16. The library's screen photos: 11, 15 and 127",
+  "Threshold 6 is the geometric midpoint of 3.2 and 11.3, a factor of 1.9 on each side",
+  "Excluded from the search: radius below 3 cycles per patch (the high-pass still shapes it) and the Nyquist row and column (a 2-pixel alternation along either axis)"],
  os.path.join(ASSETS, "fig_peaks.png"),
- "The threshold is eight, and it is not a guess. Synthetic negatives, white, pink, smoothed, anisotropic, and "
- "JPEG-blocked noise, score between one point one and three point eight. Twenty-eight ordinary library files from "
- "four cameras score between one point six and seven point one. On the positive side, a sinusoid at half the noise "
- "amplitude scores thirty-three, a noise-strength grid covering just eleven percent of the frame scores sixteen, "
- "and the screen photo scores forty-one. Eight has a factor of two of margin on both sides. Two kinds of bins are "
- "excluded from the search: anything below three cycles per patch, where the sigma-eight high-pass still shapes the "
- "spectrum, and the two Nyquist-on-axis bins, because a two-pixel alternation is something any pipeline's "
- "sharpening can produce and it is not scene texture."),
+ "The threshold is six, and it is not a guess. Synthetic negatives, white, pink, smoothed, anisotropic, and "
+ "JPEG-blocked noise, score between one and one point eight. Thirty-four ordinary library files from five cameras, "
+ "including the four former false positives, score between one point three and three point two. On the positive "
+ "side, sinusoids at half the noise amplitude score fifteen to forty-eight, a noise-strength grid covering just "
+ "eleven percent of the frame scores sixteen, and the library's screen photos score eleven, fifteen and one hundred "
+ "twenty-seven. Six is the geometric midpoint of three point two and eleven point three, a factor of one point nine "
+ "on each side. Two kinds of bins are excluded from the search: anything below three cycles per patch, where the "
+ "sigma-eight high-pass still shapes the spectrum, and the whole Nyquist row and column, because a two-pixel "
+ "alternation along either axis is something sampling and sharpening produce, not scene texture."),
 
 ("What the flag does, and a surprise from the test suite",
  ["noise_spectral_peak, noise_periodic_suspect, noise_periodic_freq_cpp, noise_periodic_fraction in the CSV",
@@ -230,17 +237,18 @@ SLIDES = [
 ("More questions, on the detector and on process",
  ["Why average spectra across patches? A single 32x32 patch cannot see a pattern at a fraction of the noise power; coherent averaging over thousands of patches can",
   "Why is the periodogram noisy? Each bin of a white-noise periodogram is chi-squared with 2 degrees of freedom; max over median of ~500 bins is about 6, and up to 14",
-  "Why exclude Nyquist-on-axis? A 2-pixel alternation is a pipeline artefact, not scene texture; measured 1 to 6 on ordinary files",
-  "What about JPEG blocking? Periodic at 1/8 cycle per pixel on the axes; measured 2.2 to 2.8 synthetic, below threshold",
+  "Why exclude the Nyquist row and column? A 2-pixel alternation along either axis is a sampling and demosaic artefact; a compact camera put its strongest energy there",
+  "What about JPEG blocking? Periodic at 1/8 cycle per pixel on the axes; measured 1.6 to 1.7 synthetic, far below threshold",
   "How did you use Claude Code? Test-first, an adversarial review run that found 13 correctness issues, each pinned by a test; the model proposed, the tests decided"],
  None,
  "On the detector itself. Why average spectra across patches: a single patch cannot see a pattern whose power is a "
  "fraction of the noise, but coherent averaging over thousands of patches can. Why is a single periodogram noisy: "
  "each bin of a white-noise periodogram is chi-squared with two degrees of freedom, so the maximum over the median "
  "of five hundred bins is about six on a typical patch and up to fourteen; that is why a per-patch threshold would "
- "never work. Why exclude Nyquist on the axes: a two-pixel alternation is a pipeline artefact, measured between one "
- "and six on ordinary files. What about JPEG blocking: it is periodic at one eighth cycle per pixel on the axes, "
- "and it measured below three on synthetic q fifty and q seventy-five files. And on process: Claude Code worked "
+ "never work. Why exclude the Nyquist row and column: a two-pixel alternation along either axis is a sampling and "
+ "demosaic artefact, and a compact camera in the library put its strongest spectral energy exactly there. What about "
+ "JPEG blocking: it is periodic at one eighth cycle per pixel on the axes, and it measured below two on synthetic q "
+ "fifty and q seventy-five files. And on process: Claude Code worked "
  "test-first, an adversarial review run found thirteen correctness issues that were each pinned by a test, and the "
  "model proposed while the tests decided."),
 

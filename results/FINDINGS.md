@@ -79,13 +79,24 @@ comparable here. Cross-camera DR from this run is a scene statement, not a senso
 
 ## 5. Metrics I do not trust, and why
 
-1. **Photos of screens read as noise.** Before the texture flag, the two "noisiest" images in the
-   library (18–21 dB at ISO 50–125) were photographs of a monitor: the pixel grid and its moiré are a
-   periodic texture the single-frame estimator cannot separate from noise. The `noise_texture_suspect`
-   flag (whiteness > 0.7) now catches 21 such frames and excludes them, but one screen photo with a
-   fine, white-looking stripe pattern (whiteness 0.12, 15.6 % clipped) still passes and sits in the
-   noisiest-valid list. A proper fix is spectral: flag patches whose residual spectrum has sharp
-   peaks. Open.
+1. **Photos of screens read as noise: resolved by a spectral detector (second run, 13:56 ET).** The
+   whiteness flag (> 0.7) catches smooth, heavily noise-reduced frames and 21 coarse screen photos, but a
+   fine pixel grid photographed at noise amplitude has a *white-looking* residual (whiteness 0.10-0.16) and
+   passed. `noise_spectral_peak` now averages the unit-power spectrum of every candidate patch, divides by
+   the annulus median (radial envelope) and by the larger of the row and column medians at 2-4 bins (so an
+   axis ridge from demosaicing, JPEG or oriented texture scores ~1), and takes the maximum over radius >= 3
+   cycles/patch outside the Nyquist row and column. Threshold 6 is the geometric midpoint of the measured
+   gap: the largest ordinary file scores 3.2, the weakest screen 11.3. On the full library it flags 6 of
+   389 and nothing else: four screen photos at 11-127 (ISO 64-125, SNR 21-34 dB, one of which had sat in
+   the noisiest-valid list at 20.8 dB), and two consecutive shots of a vehicle with striped bodywork at 8.3
+   (a 5-px diagonal period on 10 % of the frame, excluded under the minority rule so the rest measures;
+   the SNR of one screen photo moved 31.6 -> 32.7 dB the same way). The two flags are complementary and
+   neither subsumes the other. The remaining 383 rows are byte-identical to the first run apart from the
+   four new columns. A first version with a 7x7 block-median baseline had produced four false positives
+   at 8-12 (a D850 water frame with a vertical ridge at the lowest radius, a SeaLife with demosaic energy on
+   the Nyquist row and column, two iPhones with axis ridges next to Nyquist); looking at them produced the
+   directional baseline. Tests: `tests/test_periodic.py`. Still open: a periodic pattern at the lowest
+   radii (< 0.09 c/px) is not searched, and a full-frame pattern is flagged but its number is kept.
 2. **Single-edge sharpness was unreliable.** The first run's "softest image" (MTF50 0.011 c/px) was
    a sharp aquarium photo whose one measured ROI straddled a thin acrylic seam, a line rather than a
    step. Two gates now remove this class: a step must satisfy MTF50 × rise ≈ 0.5 (49 ROIs rejected as
@@ -110,3 +121,9 @@ comparable here. Cross-camera DR from this run is a scene statement, not a senso
 Three validity gates were added after the eye check and the numbers re-run: `not_a_step`
 (MTF50 × rise consistency), `noise_texture_suspect` (whiteness > 0.7), and a three-edge minimum for
 per-image sharpness in the report. Nothing in the measurement code was changed to move a number.
+
+**Second run, 2026-10-13 13:56 ET (741 s, 0 failures):** the spectral periodic-texture detector (section 5,
+item 1) added `noise_spectral_peak`, `noise_periodic_suspect`, `noise_periodic_freq_cpp` and
+`noise_periodic_fraction`; 6 images are flagged and leave the SNR medians; 383 rows are unchanged. The
+tables above were computed on the first run and are unchanged by it except that the four screen photos
+no longer appear among the noisiest valid images.
