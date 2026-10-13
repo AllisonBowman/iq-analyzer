@@ -39,9 +39,16 @@ def _fmt(v):
     return v
 
 
+def strip_paths(records: list[dict]) -> list[dict]:
+    """Drop the ``path`` field (the absolute location of each source file) so results can be
+    published; ``file`` (the basename) stays as the row key.  Returns new dicts."""
+    return [{k: v for k, v in r.items() if k != "path"} for r in records]
+
+
 def write_csv(records: list[dict], path: str) -> None:
     with open(path, "w", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=CSV_COLUMNS, extrasaction="ignore")
+        present = {k for r in records for k in r}
+        w = csv.DictWriter(fh, fieldnames=[c for c in CSV_COLUMNS if c in present], extrasaction="ignore")
         w.writeheader()
         for r in records:
             w.writerow({k: _fmt(r.get(k)) for k in CSV_COLUMNS})

@@ -32,7 +32,7 @@ def _collect(paths: list[str], recursive: bool) -> list[str]:
 
 def cmd_analyze(args: argparse.Namespace) -> int:
     from .analyze import analyze_file
-    from .report import write_charts, write_csv, write_json, write_markdown
+    from .report import strip_paths, write_charts, write_csv, write_json, write_markdown
 
     files = _collect(args.paths, args.recursive)
     if args.list:
@@ -64,6 +64,8 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     if not records:
         print("nothing analysed", file=sys.stderr)
         return 1
+    if args.no_paths:
+        records = strip_paths(records)
     write_csv(records, os.path.join(args.out, "results.csv"))
     write_json(records, os.path.join(args.out, "results.json"))
     charts = write_charts(records, os.path.join(args.out, "charts"))
@@ -132,10 +134,12 @@ def cmd_report(args: argparse.Namespace) -> int:
     import json
     import numpy as np
     from .noise import NoiseResult
-    from .report import write_charts, write_csv, write_markdown
+    from .report import strip_paths, write_charts, write_csv, write_markdown
 
     with open(args.json) as fh:
         records = json.load(fh)
+    if args.no_paths:
+        records = strip_paths(records)
     for r in records:
         nc = r.pop("noise_curve", None)
         r.pop("edges", None)
@@ -168,6 +172,7 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("--max-rois", type=int, default=30, help="edges measured per image")
     a.add_argument("--max-side", type=int, default=None, help="downsample long side (changes sharpness; avoid)")
     a.add_argument("--title", default="Image quality report")
+    a.add_argument("--no-paths", action="store_true", help="omit the source file paths from results.csv and results.json (for publishing)")
     a.set_defaults(func=cmd_analyze)
 
     s = sub.add_parser("sfr", help="slanted-edge SFR of one ROI in one image")
@@ -181,6 +186,7 @@ def main(argv: list[str] | None = None) -> int:
     rp.add_argument("json")
     rp.add_argument("--out", default=None)
     rp.add_argument("--title", default="Image quality report")
+    rp.add_argument("--no-paths", action="store_true", help="omit the source file paths from the rebuilt results.csv")
     rp.set_defaults(func=cmd_report)
 
     d = sub.add_parser("demo", help="synthetic end-to-end run with known ground truth")

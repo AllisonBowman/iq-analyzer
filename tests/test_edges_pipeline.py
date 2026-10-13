@@ -55,3 +55,14 @@ def test_end_to_end_on_png_and_jpeg(tmp_path):
     assert (out / "results.csv").read_text().count("\n") == 3   # header + 2 rows
     assert "## Summary" in (out / "report.md").read_text()
     assert os.path.getsize(out / "results.json") > 1000
+
+
+def test_no_paths_strips_the_path_column(tmp_path):
+    import csv
+    from iqa.report import strip_paths, write_csv
+    recs = [{"file": "a.jpg", "path": "/somewhere/private/a.jpg", "snr_midgrey_db": 30.0}]
+    write_csv(strip_paths(recs), str(tmp_path / "r.csv"))
+    with open(tmp_path / "r.csv") as fh:
+        header = next(csv.reader(fh))
+    assert "path" not in header and "file" in header
+    assert recs[0]["path"].startswith("/somewhere")      # the input is not mutated

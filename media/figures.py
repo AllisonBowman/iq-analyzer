@@ -9,9 +9,19 @@ from iqa.noise import (_annular_baseline, _local_baseline, _local_stats, periodi
                        PERIODIC_PEAK_THRESHOLD, PERIODIC_MIN_RADIUS)
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build", "assets")
-LIB = os.path.expanduser("~/Pictures/Photos Library.photoslibrary/originals")
-SCREEN = f"{LIB}/6/6721B8DA-E5D3-4B54-B807-8DB95C9B4FCE.jpeg"
-D850 = f"{LIB}/0/014D71F2-10CD-43AD-AF2F-AC5430B122AF.jpeg"
+
+def _resolve(prefix: str) -> str:
+    """Find a library file by the start of its name through the local results.json (which keeps
+    paths unless the run used --no-paths; the published results.csv does not carry them)."""
+    import json
+    with open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "results", "results.json")) as fh:
+        for r in json.load(fh):
+            if r["file"].startswith(prefix) and r.get("path"):
+                return r["path"]
+    raise SystemExit(f"no path for {prefix}: re-run `iqa analyze` without --no-paths to regenerate results.json")
+
+SCREEN = _resolve("6721B8DA")
+D850 = _resolve("014D71F2")
 N = 32
 plt.rcParams.update({"font.size": 13, "figure.dpi": 110})
 
