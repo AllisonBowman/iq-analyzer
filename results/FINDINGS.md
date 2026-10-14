@@ -127,3 +127,11 @@ item 1) added `noise_spectral_peak`, `noise_periodic_suspect`, `noise_periodic_f
 `noise_periodic_fraction`; 6 images are flagged and leave the SNR medians; 383 rows are unchanged. The
 tables above were computed on the first run and are unchanged by it except that the four screen photos
 no longer appear among the noisiest valid images.
+
+**Third run, 2026-10-13 ~16:40 ET (697 s, 0 failures):** 95 % percentile-bootstrap intervals on the
+per-image MTF50 median and p80 (`mtf50_*_ci_lo/hi_cpp`, `iqa/uncertainty.py`); every other column is
+identical to the second run. What the intervals say about this library: of the 73 images with a
+sharpness figure, the median relative width of the interval on the median MTF50 is 0.57 (p90 1.05); by
+edge count, 0.59 with 3-5 edges, 0.64 with 6-10, 0.40 with more than 10. A per-image sharpness figure
+from natural edges is therefore good to about +/- 30 %, and the "sharpest image" rankings in report.md
+should be read as bands, not an order; the per-camera medians over many images are much tighter.

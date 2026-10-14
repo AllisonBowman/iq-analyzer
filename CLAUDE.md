@@ -13,9 +13,9 @@ overnight on 2026-10-13 by Claude from a cloud session; Claude Code on this Mac 
 Keep that audience in mind: a camera-team engineer will read this code. Prefer correctness,
 clear method notes with the ISO reference, and validation against ground truth over features.
 
-## State of the project (as of 2026-10-13 15:30 ET)
+## State of the project (as of 2026-10-13 16:45 ET)
 
-Done and validated (88 tests pass: `python3 -m pytest -q`):
+Done and validated (95 tests pass: `python3 -m pytest -q`):
 - **A first adversarial review ran on this Mac** (`claude -p` with REVIEW_PROMPT.md, output in
   `REVIEW.md`, 12 min). It found 13 correctness issues and 13 methodology caveats. Fixed the same
   night, each pinned by a test in `tests/test_adversarial.py`: clipped plateaus now rejected
@@ -62,7 +62,8 @@ Not done yet:
   `iqa/chart_sfr.py`, 14 tests): no real ColorChecker or e-SFR chart photo exists in the library.
   The first real chart shoot is the next validation step; expect the detector thresholds (Otsu,
   the 15 % side tolerance, the mcc confidence) to need a look on a real print.
-- No uncertainty estimates (CI on MTF50 from the per-edge spread would be the first).
+- **Uncertainty: done** (`iqa/uncertainty.py`, third full run). Per-image natural-edge MTF50 carries a
+  95 % interval about +/- 30 % wide (FINDINGS §6); per-camera medians over many images are far tighter.
 - Not packaged (`pyproject.toml` is minimal); no CI.
 
 ## Environment on this Mac
@@ -86,9 +87,10 @@ Not done yet:
 
 The morning run, the periodic-texture detector, `--no-paths` (the repo is public) and chart mode
 (ColorChecker dE00 + WB, e-SFR field map; synthetic validation only) are done, 2026-10-13.
-Next, in Allison's priority order: a bootstrap CI on per-image MTF50 from the per-edge spread
-(roadmap item 4 in her list); then shoot a real ColorChecker and e-SFR chart to validate chart
-mode on a print. MORNING_PROMPT.md is kept for reference / re-runs. `media/make_explainer.py`
+The bootstrap interval (her task 4) is done too; results.csv carries it. Next: shoot a real
+ColorChecker and e-SFR chart to validate chart mode on a print; then the open review items (a
+two-cluster split for shallow-DOF frames; matched RAW/HEIC pairs). The step-by-step slide show
+lives at the Claude artifact "How iq-analyzer Reads a Photo" (figures from `media/deck_figures.py`). MORNING_PROMPT.md is kept for reference / re-runs. `media/make_explainer.py`
 builds the narrated explainer video (run `media/figures.py` first; `say` and pip need the Claude
 Code sandbox off).
 
