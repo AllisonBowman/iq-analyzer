@@ -77,3 +77,7 @@ iqa/synth.py     synthetic ground-truth images (edges, scenes, both charts)
 media/           the narrated explainer video generator
 tests/           88 tests (test_adversarial.py pins the review's findings)
 ```
+
+## License
+
+MIT, see `LICENSE`.

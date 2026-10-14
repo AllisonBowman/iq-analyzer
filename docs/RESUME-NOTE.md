@@ -5,8 +5,7 @@ repository, on 2026-10-13, and every claim below is checkable in the repo.
 
 ## The link
 
-https://github.com/AllisonBowman/iq-analyzer (public, MIT-less for now: no licence file yet;
-add one before anyone forks it)
+https://github.com/AllisonBowman/iq-analyzer (public, MIT licence)
 
 Put it as a plain URL in the Projects section and in the LinkedIn Featured section. On the resume
 use the short form `github.com/AllisonBowman/iq-analyzer`. The README's first screen is the
