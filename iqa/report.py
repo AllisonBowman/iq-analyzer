@@ -14,7 +14,8 @@ CSV_COLUMNS = [
     "focal_mm", "datetime", "width", "height",
     "color_profile",
     "edges_candidates", "edges_measured", "edges_rejected", "edges_reject_reasons",
-    "mtf50_median_cpp", "mtf50_p80_cpp", "mtf50_max_cpp", "mtf50p_median_cpp", "mtf50_p80_lwph",
+    "mtf50_median_cpp", "mtf50_median_ci_lo_cpp", "mtf50_median_ci_hi_cpp",
+    "mtf50_p80_cpp", "mtf50_p80_ci_lo_cpp", "mtf50_p80_ci_hi_cpp", "mtf50_max_cpp", "mtf50p_median_cpp", "mtf50_p80_lwph",
     "mtf50_v_median_cpp", "mtf50_h_median_cpp", "mtf50_center_median_cpp", "mtf50_outer_median_cpp",
     "edges_center", "edges_outer", "edge_rise_median_px", "mtf_nyquist_median", "overshoot_median_pct",
     "noise_patches", "noise_candidate_patches", "noise_rejection_rate", "noise_whiteness", "noise_texture_suspect",
@@ -320,7 +321,7 @@ def write_markdown(records: list[dict], charts: list[str], path: str, title: str
 
     lines += ["## How to read these numbers", "",
               "- **MTF50** is the spatial frequency (cycles per pixel, along the edge normal) at which contrast falls to 50 %. Higher is sharper; 0.25-0.35 is very sharp (often sharpened), 0.10-0.15 is soft. Measured on natural slanted edges with the ISO 12233 e-SFR method: a real edge is never a perfect step, so every figure is a scene-dependent *lower bound* on the system MTF, consistent across images of similar subjects but not a chart-grade absolute. The 'sharpest images' ranking compares scenes as much as lenses.",
-              "- **In-focus sharpness (p80)** assumes at least a fifth of the measured edges are in the plane of focus; on a shallow-depth-of-field frame with few in-focus edges it reports the background. Check `edges_measured` and `mtf50_max_cpp`.",
+              "- **In-focus sharpness (p80)** assumes at least a fifth of the measured edges are in the plane of focus; on a shallow-depth-of-field frame with few in-focus edges it reports the background. Check `edges_measured` and `mtf50_max_cpp`. `mtf50_*_ci_lo/hi_cpp` are 95 % percentile-bootstrap intervals over the measured edges: how far the figure would move with a different handful of edges from the same frame. With few edges they are wide and reach the sample's extremes; they do not include the scene-dependent bias of natural edges.",
               "- **Overshoot** is how far the edge profile overshoots its bright plateau, in % of the step: a direct measure of sharpening halo. MTF50P (relative to the MTF peak) is the sharpening-robust companion of MTF50.",
               "- **SNR at mid-grey** is 20·log10(118 / noise std) on the 8-bit luminance of flat patches; 35+ dB is clean, below 25 dB is visibly noisy. 8-bit quantisation alone caps it at about 52 dB. The figure is output-referred: noise reduction and JPEG/HEIC compression lower it as much as the sensor does, so SNR-vs-ISO across formats is partly a chart of processing. `noise_whiteness` near 0.14 means white noise; 0.3+ means the noise has been smoothed by NR or compression. `noise_spectral_peak` is how far the strongest frequency in the averaged patch spectrum stands above its surroundings: about 1 for noise, above 8 (`noise_periodic_suspect`) the flat patches contain a repeating pattern (a screen's pixel grid, a weave, halftone) at `noise_periodic_freq_cpp` cycles per pixel, and the SNR is of the pattern, not the sensor.",
               "- **Dynamic range** is output-referred: the stops between near-white and the darkest level whose scene-linear SNR still exceeds the threshold. A JPEG's tone curve bounds it, and the floor can only be found in frames that contain near-black flat areas; 'lower bound' rows are excluded from the medians.",

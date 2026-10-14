@@ -16,6 +16,7 @@ from math import atan2, degrees, hypot
 import cv2
 import numpy as np
 
+from .uncertainty import bootstrap_ci
 from .sfr import SFRResult, compute_sfr
 
 
@@ -41,6 +42,8 @@ class EdgeSummary:
     mtf50_median: float = float("nan")
     mtf50_p80: float = float("nan")
     mtf50_max: float = float("nan")
+    mtf50_median_ci: tuple = (float("nan"), float("nan"))   # 95 % percentile bootstrap over the edges
+    mtf50_p80_ci: tuple = (float("nan"), float("nan"))
     mtf50p_median: float = float("nan")
     rise_median_px: float = float("nan")
     mtf_nyquist_median: float = float("nan")
@@ -62,6 +65,10 @@ class EdgeSummary:
             "mtf50_median_cpp": self.mtf50_median,
             "mtf50_p80_cpp": self.mtf50_p80,
             "mtf50_max_cpp": self.mtf50_max,
+            "mtf50_median_ci_lo_cpp": self.mtf50_median_ci[0],
+            "mtf50_median_ci_hi_cpp": self.mtf50_median_ci[1],
+            "mtf50_p80_ci_lo_cpp": self.mtf50_p80_ci[0],
+            "mtf50_p80_ci_hi_cpp": self.mtf50_p80_ci[1],
             "mtf50p_median_cpp": self.mtf50p_median,
             "edge_rise_median_px": self.rise_median_px,
             "mtf_nyquist_median": self.mtf_nyquist_median,
@@ -193,6 +200,8 @@ def measure_natural_edges(lin_luma: np.ndarray, max_rois: int = 30, roi_len: int
         summ.mtf50_median = float(np.median(m50))
         summ.mtf50_p80 = float(np.percentile(m50, 80))
         summ.mtf50_max = float(m50.max())
+        summ.mtf50_median_ci = bootstrap_ci(m50, np.median)
+        summ.mtf50_p80_ci = bootstrap_ci(m50, lambda x: np.percentile(x, 80))
         summ.mtf50p_median = float(np.median([e.sfr.mtf50p for e in measured]))
         summ.rise_median_px = float(np.median([e.sfr.rise_10_90_px for e in measured]))
         nyq = [e.sfr.mtf_nyquist for e in measured if np.isfinite(e.sfr.mtf_nyquist)]
