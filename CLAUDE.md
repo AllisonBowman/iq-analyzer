@@ -82,6 +82,10 @@ Not done yet:
 ## Allison's to-do
 
 1. **Watch `media/build/iq-analyzer-explainer.mp4`** (12 min 51 s; rebuild with `python media/figures.py && python media/make_explainer.py`).
+2. **Watch the step-by-step slide show**, the Claude artifact "How iq-analyzer Reads a Photo"
+   (https://claude.ai/artifact/8hdZn1g3j6eu2sSGzn7Uce): 20 slides, one real photo through every stage,
+   every term defined.
+3. **Give the resume session `docs/RESUME-NOTE.md`** (paste it into that chat): how to cite the repo.
 
 ## Next task for Claude Code
 
