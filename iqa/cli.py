@@ -130,49 +130,89 @@ def cmd_demo(args: argparse.Namespace) -> int:
 
 
 def cmd_chart(args: argparse.Namespace) -> int:
-    """Colour accuracy on a ColorChecker Classic photographed in the image."""
+    """Chart mode: colour accuracy on a ColorChecker Classic and/or sharpness across the field
+    on an e-SFR chart of slanted squares, whichever the image contains."""
     import json
     import numpy as np
+    from .chart_sfr import measure_esfr_chart
     from .color import COLORCHECKER_NAMES, find_colorchecker, measure_colorchecker
     from .imageio import load_image
     img = load_image(args.image)
-    chart = find_colorchecker(img.rgb8)
-    if chart is None:
-        print("no ColorChecker found (it should fill at least a tenth of the frame, evenly lit, in focus)")
-        return 1
-    m = measure_colorchecker(img.rgb8, chart)
-    print(f"ColorChecker found: patch pitch {chart.patch_px:.0f} px, corners "
-          + " ".join(f"({x:.0f},{y:.0f})" for x, y in chart.box))
-    print(f"dE00 mean {m.de00_mean:.2f}  max {m.de00_max:.2f}  chromatic {m.de00_chromatic_mean:.2f}  "
-          f"neutral {m.de00_neutral_mean:.2f}   WB error R/G {m.wb_r_over_g_stops:+.2f} stops, B/G {m.wb_b_over_g_stops:+.2f} stops")
-    print(f"{'patch':14s} {'measured sRGB':>16s}  {'L*':>6s} {'a*':>6s} {'b*':>6s}   dE00")
-    for i, name in enumerate(COLORCHECKER_NAMES):
-        r, g, b = m.measured_srgb[i]; L, a, bb = m.measured_lab[i]
-        print(f"{name:14s} {r:5.0f} {g:5.0f} {b:5.0f}  {L:6.1f} {a:6.1f} {bb:6.1f}   {m.de00[i]:.2f}")
+    out: dict = {"file": args.image}
+    found = 0
+
+    cc = None if args.esfr_only else find_colorchecker(img.rgb8)
+    if cc is not None:
+        found += 1
+        m = measure_colorchecker(img.rgb8, cc)
+        print(f"ColorChecker found: patch pitch {cc.patch_px:.0f} px, corners "
+              + " ".join(f"({x:.0f},{y:.0f})" for x, y in cc.box))
+        print(f"dE00 mean {m.de00_mean:.2f}  max {m.de00_max:.2f}  chromatic {m.de00_chromatic_mean:.2f}  "
+              f"neutral {m.de00_neutral_mean:.2f}   WB error R/G {m.wb_r_over_g_stops:+.2f} stops, B/G {m.wb_b_over_g_stops:+.2f} stops")
+        print(f"{'patch':14s} {'measured sRGB':>16s}  {'L*':>6s} {'a*':>6s} {'b*':>6s}   dE00")
+        for i, name in enumerate(COLORCHECKER_NAMES):
+            r, g, b = m.measured_srgb[i]; L, a, bb = m.measured_lab[i]
+            print(f"{name:14s} {r:5.0f} {g:5.0f} {b:5.0f}  {L:6.1f} {a:6.1f} {bb:6.1f}   {m.de00[i]:.2f}")
+        out.update({"cc_box": cc.box.tolist(), "cc_patch_px": cc.patch_px, "cc_names": COLORCHECKER_NAMES, **m.as_dict()})
+    elif not args.esfr_only:
+        print("no ColorChecker found")
+
+    es = None if args.cc_only else measure_esfr_chart(img.lin_luma)
+    if es is not None and es.n_squares:
+        found += 1
+        print(f"e-SFR chart: {es.n_squares} slanted squares, {es.n_edges} valid edges"
+              + (f", rejected {es.reject_reasons}" if es.reject_reasons else ""))
+        print(f"MTF50 median {es.mtf50_median:.4f} c/px   centre {es.mtf50_center_median:.4f}   outer {es.mtf50_outer_median:.4f}   "
+              f"radial {es.mtf50_radial_median:.4f}   tangential {es.mtf50_tangential_median:.4f}   "
+              f"MTF50P {es.mtf50p_median:.4f}   overshoot {es.overshoot_median_pct:.1f} %")
+        print(f"{'square':>6s} {'x':>6s} {'y':>6s} {'r':>5s} {'edges':>5s} {'MTF50 mean':>10s}")
+        for i, sq in enumerate(es.squares):
+            print(f"{i:6d} {sq.centre[0]:6.0f} {sq.centre[1]:6.0f} {sq.radius:5.2f} {len(sq.edges):5d} {sq.mtf50_mean:10.4f}")
+        out.update(es.as_dict())
+    elif not args.cc_only:
+        print("no e-SFR chart (slanted squares) found")
+
     if args.json:
         with open(args.json, "w") as fh:
-            json.dump({"file": args.image, "box": chart.box.tolist(), "patch_px": chart.patch_px,
-                       "names": COLORCHECKER_NAMES, **m.as_dict()}, fh, indent=1)
+            json.dump(out, fh, indent=1)
         print(f"json -> {args.json}")
     if args.plot:
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
-        from .color import lab_to_srgb8, COLORCHECKER_LAB
-        fig, ax = plt.subplots(1, 2, figsize=(12, 5))
-        ax[0].imshow(img.rgb8); ax[0].plot(*np.vstack([chart.box, chart.box[:1]]).T, "y-", lw=1.5)
-        ax[0].scatter(chart.centres[:, 0], chart.centres[:, 1], s=12, c="yellow"); ax[0].set_title("detected chart"); ax[0].axis("off")
-        ref = lab_to_srgb8(COLORCHECKER_LAB)
-        tile = np.zeros((4 * 60, 6 * 60, 3), dtype=np.uint8)
-        for i in range(24):
-            r0, c0 = (i // 6) * 60, (i % 6) * 60
-            tile[r0:r0 + 60, c0:c0 + 30] = np.clip(m.measured_srgb[i], 0, 255).astype(np.uint8)
-            tile[r0:r0 + 60, c0 + 30:c0 + 60] = ref[i]
-            ax[1].text(c0 + 30, r0 + 55, f"{m.de00[i]:.1f}", ha="center", fontsize=8, color="w" if i >= 18 and i < 21 else "k")
-        ax[1].imshow(tile); ax[1].set_title("measured (left half) vs reference (right half), dE00"); ax[1].axis("off")
+        panels = 1 + (cc is not None) + (es is not None and es.n_squares > 0)
+        fig, axes = plt.subplots(1, panels, figsize=(6 * panels, 5.5))
+        axes = np.atleast_1d(axes)
+        ax = axes[0]; ax.imshow(img.rgb8); ax.set_title("detections"); ax.axis("off")
+        k = 1
+        if cc is not None:
+            ax.plot(*np.vstack([cc.box, cc.box[:1]]).T, "y-", lw=1.5)
+            ax.scatter(cc.centres[:, 0], cc.centres[:, 1], s=10, c="yellow")
+            from .color import COLORCHECKER_LAB, lab_to_srgb8
+            ref = lab_to_srgb8(COLORCHECKER_LAB)
+            tile = np.zeros((4 * 60, 6 * 60, 3), dtype=np.uint8)
+            for i in range(24):
+                r0, c0 = (i // 6) * 60, (i % 6) * 60
+                tile[r0:r0 + 60, c0:c0 + 30] = np.clip(m.measured_srgb[i], 0, 255).astype(np.uint8)
+                tile[r0:r0 + 60, c0 + 30:c0 + 60] = ref[i]
+                dark = m.measured_lab[i][0] < 55
+                axes[k].text(c0 + 30, r0 + 55, f"{m.de00[i]:.1f}", ha="center", fontsize=8, color="w" if dark else "k")
+            axes[k].imshow(tile); axes[k].set_title(f"measured | reference, dE00 (mean {m.de00_mean:.2f})"); axes[k].axis("off")
+            k += 1
+        if es is not None and es.n_squares:
+            for sq in es.squares:
+                for e in sq.edges:
+                    ax.add_patch(plt.Rectangle((e.x0, e.y0), e.w, e.h, fill=False, ec="cyan", lw=0.8))
+            xs = [sq.centre[0] for sq in es.squares]; ys = [sq.centre[1] for sq in es.squares]
+            vals = [sq.mtf50_mean for sq in es.squares]
+            sc = axes[k].scatter(xs, ys, c=vals, s=240, cmap="viridis", edgecolor="k")
+            for x, y, v in zip(xs, ys, vals):
+                axes[k].text(x, y, f"{v:.3f}", ha="center", va="center", fontsize=7, color="w")
+            axes[k].set_xlim(0, img.width); axes[k].set_ylim(img.height, 0); axes[k].set_aspect("equal")
+            axes[k].set_title("MTF50 across the field (c/px, mean of 4 edges)"); plt.colorbar(sc, ax=axes[k], fraction=0.046)
         fig.tight_layout(); fig.savefig(args.plot, dpi=130)
         print(f"plot -> {args.plot}")
-    return 0
+    return 0 if found else 1
 
 
 def cmd_report(args: argparse.Namespace) -> int:
@@ -235,8 +275,10 @@ def main(argv: list[str] | None = None) -> int:
     rp.add_argument("--no-paths", action="store_true", help="omit the source file paths from the rebuilt results.csv")
     rp.set_defaults(func=cmd_report)
 
-    c = sub.add_parser("chart", help="colour accuracy (CIEDE2000, white balance) on a ColorChecker Classic in the image")
+    c = sub.add_parser("chart", help="chart mode: ColorChecker colour accuracy (CIEDE2000, white balance) and/or e-SFR slanted-square sharpness across the field")
     c.add_argument("image")
+    c.add_argument("--cc-only", action="store_true", help="only look for a ColorChecker")
+    c.add_argument("--esfr-only", action="store_true", help="only look for slanted squares")
     c.add_argument("--json", default=None, help="write the per-patch results to this JSON file")
     c.add_argument("--plot", default=None, help="write a detection + swatch comparison PNG")
     c.set_defaults(func=cmd_chart)

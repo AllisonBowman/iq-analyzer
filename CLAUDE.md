@@ -13,9 +13,9 @@ overnight on 2026-10-13 by Claude from a cloud session; Claude Code on this Mac 
 Keep that audience in mind: a camera-team engineer will read this code. Prefer correctness,
 clear method notes with the ISO reference, and validation against ground truth over features.
 
-## State of the project (as of 2026-10-13 14:15 ET)
+## State of the project (as of 2026-10-13 15:30 ET)
 
-Done and validated (73 tests pass: `python3 -m pytest -q`):
+Done and validated (88 tests pass: `python3 -m pytest -q`):
 - **A first adversarial review ran on this Mac** (`claude -p` with REVIEW_PROMPT.md, output in
   `REVIEW.md`, 12 min). It found 13 correctness issues and 13 methodology caveats. Fixed the same
   night, each pinned by a test in `tests/test_adversarial.py`: clipped plateaus now rejected
@@ -58,7 +58,10 @@ Not done yet:
   minimum). Read `results/FINDINGS.md` before touching the metrics: it lists what is and is not
   trustworthy on this library (screen photos, single-edge frames, DR lower bounds, HEIC/JPEG provenance).
   Re-render charts without re-analysing: `python -m iqa report results/results.json --title "..."`.
-- No chart mode beyond `iqa sfr --roi` (no automatic ColorChecker / ISO 12233 chart detection).
+- **Chart mode is built but has only been run on synthetic charts** (`iqa chart`, `iqa/color.py`,
+  `iqa/chart_sfr.py`, 14 tests): no real ColorChecker or e-SFR chart photo exists in the library.
+  The first real chart shoot is the next validation step; expect the detector thresholds (Otsu,
+  the 15 % side tolerance, the mcc confidence) to need a look on a real print.
 - No uncertainty estimates (CI on MTF50 from the per-edge spread would be the first).
 - Not packaged (`pyproject.toml` is minimal); no CI.
 
@@ -81,10 +84,11 @@ Not done yet:
 
 ## Next task for Claude Code
 
-The morning run and the periodic-texture detector are done (second full run 2026-10-13 13:56 ET).
-Next, in Allison's priority order: strip the `path` column from results.csv and add `--no-paths`
-so the repo can go public; chart mode (roadmap item 3); a bootstrap CI on per-image MTF50 from the
-per-edge spread. MORNING_PROMPT.md is kept for reference / re-runs. `media/make_explainer.py`
+The morning run, the periodic-texture detector, `--no-paths` (the repo is public) and chart mode
+(ColorChecker dE00 + WB, e-SFR field map; synthetic validation only) are done, 2026-10-13.
+Next, in Allison's priority order: a bootstrap CI on per-image MTF50 from the per-edge spread
+(roadmap item 4 in her list); then shoot a real ColorChecker and e-SFR chart to validate chart
+mode on a print. MORNING_PROMPT.md is kept for reference / re-runs. `media/make_explainer.py`
 builds the narrated explainer video (run `media/figures.py` first; `say` and pip need the Claude
 Code sandbox off).
 
@@ -103,9 +107,7 @@ Code sandbox off).
 1. Real-photo run + FINDINGS.md (above). This is what goes in the application.
 2. Per-lens / per-camera comparison charts (MTF50 and SNR vs ISO, grouped by `camera_model` and
    `lens`), and MTF50 across the frame (centre vs edge ROIs) for lens-softness maps.
-3. Chart mode: detect an ISO 12233:2014 e-SFR chart or a ColorChecker in a photo; add colour
-   accuracy (ΔE2000 vs reference patches) and white-balance error. This completes the ISO
-   metric set the posting names.
+3. ~~Chart mode~~ done 2026-10-13 (synthetic validation; real chart shoot pending).
 4. HEIC vs RAW (DNG) pairs from the same shot: quantify what the iPhone pipeline does to noise,
    sharpening (MTF50P vs MTF50 overshoot) and dynamic range.
 5. A one-page write-up with the three best charts, for the application and LinkedIn.

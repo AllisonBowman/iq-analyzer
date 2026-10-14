@@ -145,3 +145,42 @@ def render_colorchecker(size: int = 1600, tilt: float = 0.15, seed: int = 0,
     cc = canonical_centres() * pitch + frame
     pts = cv2.perspectiveTransform(cc.reshape(-1, 1, 2).astype(np.float64), M.astype(np.float64)).reshape(-1, 2)
     return warped, pts
+
+
+def render_esfr_chart(size: int = 2000, cols: int = 5, rows: int = 4, angle_deg: float = 5.0,
+                      sigma_px=1.0, low: float = 0.15, high: float = 0.75, noise: float = 0.0,
+                      square_frac: float = 0.45, seed: int = 0) -> tuple[np.ndarray, list[dict]]:
+    """An ISO 12233:2014-style e-SFR target: ``cols`` x ``rows`` dark squares on a light field,
+    each rotated ``angle_deg``, rendered from the analytic Gaussian edge spread function so every
+    side is an exact slanted edge with MTF exp(-2 pi^2 sigma^2 f^2).
+
+    ``sigma_px`` is a number or a function of the normalised radius r (0 at the centre, 1 at
+    the corner) giving each square's blur: a field-dependent lens.  Returns the scene-linear
+    luminance (size x size, 0..1) and, per square, ``{"centre": (x, y), "half": half side,
+    "sigma": sigma}``.
+    """
+    rng = np.random.default_rng(seed)
+    img = np.full((size, size), high, dtype=np.float64)
+    pitch = size / (max(cols, rows) + 1)
+    half = 0.5 * square_frac * pitch
+    th = np.radians(angle_deg)
+    c, s = np.cos(th), np.sin(th)
+    yy, xx = np.mgrid[0:size, 0:size].astype(np.float64)
+    truth = []
+    cx0 = (size - (cols - 1) * pitch) / 2.0
+    cy0 = (size - (rows - 1) * pitch) / 2.0
+    for j in range(rows):
+        for i in range(cols):
+            cx, cy = cx0 + i * pitch, cy0 + j * pitch
+            r = float(np.hypot(cx - size / 2.0, cy - size / 2.0) / np.hypot(size / 2.0, size / 2.0))
+            sig = float(sigma_px(r)) if callable(sigma_px) else float(sigma_px)
+            # rotated square: signed distance to the boundary is max(|u|,|v|) - half
+            u = (xx - cx) * c + (yy - cy) * s
+            v = -(xx - cx) * s + (yy - cy) * c
+            d = np.maximum(np.abs(u), np.abs(v)) - half
+            inside = 0.5 * (1.0 - erf(d / (sig * np.sqrt(2.0))))      # 1 inside, 0 outside, blurred
+            img = img + (low - high) * inside
+            truth.append({"centre": (cx, cy), "half": half, "sigma": sig})
+    if noise > 0:
+        img = img + rng.normal(0.0, noise, img.shape)
+    return np.clip(img, 0.0, 1.0), truth
