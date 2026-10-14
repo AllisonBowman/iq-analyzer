@@ -91,8 +91,11 @@ Not done yet:
 
 The morning run, the periodic-texture detector, `--no-paths` (the repo is public) and chart mode
 (ColorChecker dE00 + WB, e-SFR field map; synthetic validation only) are done, 2026-10-13.
-The bootstrap interval (her task 4) is done too; results.csv carries it. Next: shoot a real
-ColorChecker and e-SFR chart to validate chart mode on a print; then the open review items (a
+The bootstrap interval (her task 4) is done too; results.csv carries it. **IQ Coach**, the macOS
+coaching app, is built under `mac/IQCoach/` (spec `docs/APP-IQ-COACH-SPEC.md`; 43 Swift tests;
+`--snapshot` renders screens headless; `--window-shots` captures the live window but needs an awake
+display). Not yet exercised live: Analyze Folder, the file pickers, Table sorting. Next: shoot a real
+ColorChecker and e-SFR chart (`docs/CHART-SHOOT-HANDOFF.md`) to validate chart mode on a print; then the open review items (a
 two-cluster split for shallow-DOF frames; matched RAW/HEIC pairs). The step-by-step slide show
 lives at the Claude artifact "How iq-analyzer Reads a Photo" (figures from `media/deck_figures.py`). MORNING_PROMPT.md is kept for reference / re-runs. `media/make_explainer.py`
 builds the narrated explainer video (run `media/figures.py` first; `say` and pip need the Claude

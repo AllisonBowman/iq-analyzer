@@ -60,6 +60,16 @@ so NR and compression lower it as much as the sensor does; 8-bit quantisation ca
 dynamic range of a processed JPEG is bounded by its tone curve and by whether the frame has
 near-black flat areas.
 
+## IQ Coach, the Mac app
+
+`mac/IQCoach/` is a SwiftUI app (macOS 15, Swift 6, Swift Charts) that reads `results.json` and
+coaches: per camera, what it does well and badly and what to change when shooting (ISO ceiling,
+lens choice, corner softness, highlight discipline, sharpening, colour lean, slow-shutter softness),
+and per photo, what to do in Apple Photos, Lightroom or any editor to get the best out of it. Every
+metric is shown with a plain-language meaning, a band word and colour, and a scale. Build with
+`cd mac/IQCoach && xcodegen generate && xcodebuild -scheme IQCoach -project IQCoach.xcodeproj build`;
+see `mac/IQCoach/README.md`. The spec is `docs/APP-IQ-COACH-SPEC.md`.
+
 ## Layout
 
 ```
@@ -75,6 +85,7 @@ iqa/report.py    CSV, JSON, charts, report.md
 iqa/cli.py       `python -m iqa analyze | sfr | chart | report | demo`
 iqa/synth.py     synthetic ground-truth images (edges, scenes, both charts)
 media/           the narrated explainer video generator
+mac/IQCoach/     the macOS coaching app (SwiftUI; 43 tests)
 tests/           88 tests (test_adversarial.py pins the review's findings)
 ```
 
