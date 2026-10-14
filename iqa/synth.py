@@ -102,3 +102,46 @@ def synthetic_scene(size: int = 1400, sigma_px: float = 1.1, noise_8bit: float =
     srgb = srgb_encode(np.clip(lin, 0, 1)) * 255.0
     srgb = srgb + rng.normal(0.0, noise_8bit, srgb.shape)        # output-referred noise
     return np.clip(np.round(srgb), 0, 255).astype(np.uint8)
+
+
+def render_colorchecker(size: int = 1600, tilt: float = 0.15, seed: int = 0,
+                        background: float = 110.0) -> tuple[np.ndarray, np.ndarray]:
+    """A ColorChecker Classic rendered from its reference L*a*b* values and photographed through
+    a mild perspective (``tilt`` controls how much the far side shrinks, plus a small rotation).
+
+    Returns ``(rgb8, centres)``: the sRGB uint8 image (size x size x 3) with a plain grey
+    background, and the 24 patch centres in image pixels, row-major (dark skin first).
+    No blur, noise or compression: the caller adds those.
+    """
+    import cv2
+    from .color import COLORCHECKER_LAB, canonical_centres, lab_to_srgb8
+    rng = np.random.default_rng(seed)
+    pitch = 100                                    # canonical pixels per patch
+    patch = 0.80 * pitch
+    frame = int(0.35 * pitch)
+    W, Hh = 6 * pitch + 2 * frame, 4 * pitch + 2 * frame
+    canon = np.full((Hh, W, 3), 28, dtype=np.uint8)         # the chart's black frame and gutters
+    colours = lab_to_srgb8(COLORCHECKER_LAB)
+    for i, (u, v) in enumerate(canonical_centres()):
+        cx, cy = frame + u * pitch, frame + v * pitch
+        x0, y0 = int(round(cx - patch / 2)), int(round(cy - patch / 2))
+        canon[y0:y0 + int(patch), x0:x0 + int(patch)] = colours[i]
+    # Place the chart on the frame: scale to ~45 % of the width, perspective, rotation.
+    scale = 0.45 * size / W
+    src = np.array([[0, 0], [W, 0], [W, Hh], [0, Hh]], dtype=np.float32)
+    cxy = np.array([size / 2, size / 2])
+    half = np.array([W, Hh]) * scale / 2
+    dst = np.array([[-half[0], -half[1]], [half[0], -half[1]], [half[0], half[1]], [-half[0], half[1]]])
+    dst[:, 0] *= np.array([1 - tilt, 1 - tilt, 1 + tilt, 1 + tilt])     # far side (top) narrower
+    dst[:, 1] *= 1 - 0.3 * tilt
+    ang = np.radians(8.0 * tilt + rng.uniform(-2, 2))
+    R = np.array([[np.cos(ang), -np.sin(ang)], [np.sin(ang), np.cos(ang)]])
+    dst = (dst @ R.T + cxy + rng.uniform(-size * 0.03, size * 0.03, 2)).astype(np.float32)
+    M = cv2.getPerspectiveTransform(src, dst)
+    bg = np.full((size, size, 3), background, dtype=np.uint8)
+    warped = cv2.warpPerspective(canon, M, (size, size), flags=cv2.INTER_LINEAR,
+                                 borderMode=cv2.BORDER_TRANSPARENT, dst=bg.copy())
+    # chart-unit centres -> canonical pixels -> image pixels
+    cc = canonical_centres() * pitch + frame
+    pts = cv2.perspectiveTransform(cc.reshape(-1, 1, 2).astype(np.float64), M.astype(np.float64)).reshape(-1, 2)
+    return warped, pts

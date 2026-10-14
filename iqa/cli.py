@@ -129,6 +129,52 @@ def cmd_demo(args: argparse.Namespace) -> int:
     return rc
 
 
+def cmd_chart(args: argparse.Namespace) -> int:
+    """Colour accuracy on a ColorChecker Classic photographed in the image."""
+    import json
+    import numpy as np
+    from .color import COLORCHECKER_NAMES, find_colorchecker, measure_colorchecker
+    from .imageio import load_image
+    img = load_image(args.image)
+    chart = find_colorchecker(img.rgb8)
+    if chart is None:
+        print("no ColorChecker found (it should fill at least a tenth of the frame, evenly lit, in focus)")
+        return 1
+    m = measure_colorchecker(img.rgb8, chart)
+    print(f"ColorChecker found: patch pitch {chart.patch_px:.0f} px, corners "
+          + " ".join(f"({x:.0f},{y:.0f})" for x, y in chart.box))
+    print(f"dE00 mean {m.de00_mean:.2f}  max {m.de00_max:.2f}  chromatic {m.de00_chromatic_mean:.2f}  "
+          f"neutral {m.de00_neutral_mean:.2f}   WB error R/G {m.wb_r_over_g_stops:+.2f} stops, B/G {m.wb_b_over_g_stops:+.2f} stops")
+    print(f"{'patch':14s} {'measured sRGB':>16s}  {'L*':>6s} {'a*':>6s} {'b*':>6s}   dE00")
+    for i, name in enumerate(COLORCHECKER_NAMES):
+        r, g, b = m.measured_srgb[i]; L, a, bb = m.measured_lab[i]
+        print(f"{name:14s} {r:5.0f} {g:5.0f} {b:5.0f}  {L:6.1f} {a:6.1f} {bb:6.1f}   {m.de00[i]:.2f}")
+    if args.json:
+        with open(args.json, "w") as fh:
+            json.dump({"file": args.image, "box": chart.box.tolist(), "patch_px": chart.patch_px,
+                       "names": COLORCHECKER_NAMES, **m.as_dict()}, fh, indent=1)
+        print(f"json -> {args.json}")
+    if args.plot:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from .color import lab_to_srgb8, COLORCHECKER_LAB
+        fig, ax = plt.subplots(1, 2, figsize=(12, 5))
+        ax[0].imshow(img.rgb8); ax[0].plot(*np.vstack([chart.box, chart.box[:1]]).T, "y-", lw=1.5)
+        ax[0].scatter(chart.centres[:, 0], chart.centres[:, 1], s=12, c="yellow"); ax[0].set_title("detected chart"); ax[0].axis("off")
+        ref = lab_to_srgb8(COLORCHECKER_LAB)
+        tile = np.zeros((4 * 60, 6 * 60, 3), dtype=np.uint8)
+        for i in range(24):
+            r0, c0 = (i // 6) * 60, (i % 6) * 60
+            tile[r0:r0 + 60, c0:c0 + 30] = np.clip(m.measured_srgb[i], 0, 255).astype(np.uint8)
+            tile[r0:r0 + 60, c0 + 30:c0 + 60] = ref[i]
+            ax[1].text(c0 + 30, r0 + 55, f"{m.de00[i]:.1f}", ha="center", fontsize=8, color="w" if i >= 18 and i < 21 else "k")
+        ax[1].imshow(tile); ax[1].set_title("measured (left half) vs reference (right half), dE00"); ax[1].axis("off")
+        fig.tight_layout(); fig.savefig(args.plot, dpi=130)
+        print(f"plot -> {args.plot}")
+    return 0
+
+
 def cmd_report(args: argparse.Namespace) -> int:
     """Rebuild charts and report.md from an existing results.json without re-analysing."""
     import json
@@ -188,6 +234,12 @@ def main(argv: list[str] | None = None) -> int:
     rp.add_argument("--title", default="Image quality report")
     rp.add_argument("--no-paths", action="store_true", help="omit the source file paths from the rebuilt results.csv")
     rp.set_defaults(func=cmd_report)
+
+    c = sub.add_parser("chart", help="colour accuracy (CIEDE2000, white balance) on a ColorChecker Classic in the image")
+    c.add_argument("image")
+    c.add_argument("--json", default=None, help="write the per-patch results to this JSON file")
+    c.add_argument("--plot", default=None, help="write a detection + swatch comparison PNG")
+    c.set_defaults(func=cmd_chart)
 
     d = sub.add_parser("demo", help="synthetic end-to-end run with known ground truth")
     d.add_argument("--out", default="results_demo")
