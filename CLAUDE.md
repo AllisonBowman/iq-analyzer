@@ -75,6 +75,10 @@ Not done yet:
   review (`claude -p "$(cat REVIEW_PROMPT.md)" --allowedTools Read Grep Glob LS Write
   "Bash(.venv/bin/python:*)"`) after large changes; it costs about $3.5 and 12 minutes.
 
+## Allison's to-do
+
+1. **Watch `media/build/iq-analyzer-explainer.mp4`** (12 min 51 s; rebuild with `python media/figures.py && python media/make_explainer.py`).
+
 ## Next task for Claude Code
 
 The morning run and the periodic-texture detector are done (second full run 2026-10-13 13:56 ET).
