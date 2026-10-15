@@ -16,13 +16,13 @@ struct StructureTests {
         #expect(EditingRules.straighten(Fx.photo()) == nil)
     }
     @Test func thirdsCropFires() {
-        let a = EditingRules.thirdsCrop(Fx.photo { $0.structureThirdsDistance = 0.4; $0.structureFocusFraction = 0.2 })
+        let a = EditingRules.thirdsCrop(Fx.photo { $0.structureThirdsDistance = 0.9; $0.structureFocusFraction = 0.2 })
         #expect(a?.lightroom.contains("O") == true)
         #expect(a?.caution?.contains("taste") == true)
     }
     @Test func thirdsCropQuiet() {
-        #expect(EditingRules.thirdsCrop(Fx.photo { $0.structureThirdsDistance = 0.2; $0.structureFocusFraction = 0.2 }) == nil)
-        #expect(EditingRules.thirdsCrop(Fx.photo { $0.structureThirdsDistance = 0.4; $0.structureFocusFraction = 0.6 }) == nil)
+        #expect(EditingRules.thirdsCrop(Fx.photo { $0.structureThirdsDistance = 0.5; $0.structureFocusFraction = 0.2 }) == nil)
+        #expect(EditingRules.thirdsCrop(Fx.photo { $0.structureThirdsDistance = 0.9; $0.structureFocusFraction = 0.6 }) == nil)
         #expect(EditingRules.thirdsCrop(Fx.photo()) == nil)
     }
     @Test func shallowDepthFires() {

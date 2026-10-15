@@ -64,6 +64,7 @@ struct RootView: View {
             Button("OK", role: .cancel) {}
         } message: { Text(model.errorMessage ?? "") }
         .task {
+            if let path = LaunchOptions.openPath { model.load(url: URL(fileURLWithPath: path)) }
             if let n = LaunchOptions.analyzePhotosCount { model.analyzeFromPhotos(count: n) }
             await WindowShots.runIfRequested(model: model)
         }

@@ -163,7 +163,7 @@ enum EditingRules {
     }
 
     static func thirdsCrop(_ p: PhotoRecord) -> EditingAdvice? {
-        guard let d = p.structureThirdsDistance, d > 0.3, let f = p.structureFocusFraction, f < 0.4 else { return nil }
+        guard let d = p.structureThirdsDistance, d > 0.75, let f = p.structureFocusFraction, f < 0.4 else { return nil }
         return EditingAdvice(
             id: "thirds:\(p.id)", metric: nil,
             finding: "The subject sits \(Fmt.num(d, 2)) frame-diagonals from the nearest rule-of-thirds point, with detail concentrated in \(Fmt.share(f)) of the frame.",

@@ -16,9 +16,14 @@ if let i = arguments.firstIndex(of: "--snapshot"), arguments.count > i + 2 {
     if let i = arguments.firstIndex(of: "--analyze-photos"), arguments.count > i + 1, let n = Int(arguments[i + 1]) {
         LaunchOptions.analyzePhotosCount = n
     }
+    // `IQCoach --open <results.json>` loads a results file as the window opens.
+    if let i = arguments.firstIndex(of: "--open"), arguments.count > i + 1 {
+        LaunchOptions.openPath = arguments[i + 1]
+    }
     IQCoachApp.main()
 }
 
 enum LaunchOptions {
     nonisolated(unsafe) static var analyzePhotosCount: Int?
+    nonisolated(unsafe) static var openPath: String?
 }

@@ -13,9 +13,9 @@ overnight on 2026-10-13 by Claude from a cloud session; Claude Code on this Mac 
 Keep that audience in mind: a camera-team engineer will read this code. Prefer correctness,
 clear method notes with the ISO reference, and validation against ground truth over features.
 
-## State of the project (as of 2026-10-13 16:45 ET)
+## State of the project (as of 2026-10-15 01:30 ET)
 
-Done and validated (95 tests pass: `python3 -m pytest -q`):
+Done and validated (101 tests pass: `python3 -m pytest -q`):
 - **A first adversarial review ran on this Mac** (`claude -p` with REVIEW_PROMPT.md, output in
   `REVIEW.md`, 12 min). It found 13 correctness issues and 13 methodology caveats. Fixed the same
   night, each pinned by a test in `tests/test_adversarial.py`: clipped plateaus now rejected
@@ -64,6 +64,9 @@ Not done yet:
   the 15 % side tolerance, the mcc confidence) to need a look on a real print.
 - **Uncertainty: done** (`iqa/uncertainty.py`, third full run). Per-image natural-edge MTF50 carries a
   95 % interval about +/- 30 % wide (FINDINGS §6); per-camera medians over many images are far tighter.
+- **Structure analysis: done** (`iqa/structure.py`, fourth full run, FINDINGS §7): focus map and
+  subject centroid, thirds distance (centre-to-thirds units), orientation shares, level-edge tilt,
+  surface shares, in-focus/background MTF50 split (the review's two-cluster item).
 - Not packaged (`pyproject.toml` is minimal); no CI.
 
 ## Environment on this Mac
@@ -94,7 +97,11 @@ The morning run, the periodic-texture detector, `--no-paths` (the repo is public
 The bootstrap interval (her task 4) is done too; results.csv carries it. **IQ Coach**, the macOS
 coaching app, is built under `mac/IQCoach/` (spec `docs/APP-IQ-COACH-SPEC.md`; 43 Swift tests;
 `--snapshot` renders screens headless; `--window-shots` captures the live window but needs an awake
-display). Not yet exercised live: Analyze Folder, the file pickers, Table sorting. Next: shoot a real
+display; `--open <results.json>` loads a file at launch). The app also identifies picture contents
+on-device with Apple's Vision framework (labels, faces, text, horizon, salient subject; 60 Swift
+tests, one runs Vision on a real file) and shows the structure fields with a focus-map grid. Photos
+come in through the system picker (up to 20) or `--analyze-photos N`. Not yet exercised live by a
+session: the pickers, Table sorting, the Vision section in the running window. Next: shoot a real
 ColorChecker and e-SFR chart (`docs/CHART-SHOOT-HANDOFF.md`) to validate chart mode on a print; then the open review items (a
 two-cluster split for shallow-DOF frames; matched RAW/HEIC pairs). The step-by-step slide show
 lives at the Claude artifact "How iq-analyzer Reads a Photo" (figures from `media/deck_figures.py`). MORNING_PROMPT.md is kept for reference / re-runs. `media/make_explainer.py`

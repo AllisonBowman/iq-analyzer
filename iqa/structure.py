@@ -8,15 +8,18 @@ Method
    ``focus_region_fraction`` is the share of cells at or above half the peak: small for a subject
    against a smooth or blurred field, near one for a frame that is sharp everywhere. The
    detail-weighted centroid of those cells is the subject's position, and
-   ``composition_thirds_distance`` is its distance (in frame-diagonal units) from the nearest
-   rule-of-thirds intersection.
+   ``composition_thirds_distance`` is its distance from the nearest rule-of-thirds intersection
+   in units of the centre-to-thirds distance: 0 on a thirds point, 1 at the frame centre, about
+   2 in a corner.  Below 0.35 reads as "on a thirds point"; above 0.75 as "centred or at the edge".
 2. **Orientation.** Sobel gradients on the strongest 30 % of pixels; the magnitude-weighted shares
    of gradient direction within 22.5 degrees of horizontal (vertical structure), of vertical
    (horizontal structure), and the rest (diagonal).
-3. **Horizon tilt.** Probabilistic Hough segments on a Canny map; segments at least 40 % of the
-   frame width long and within 10 degrees of level vote with their length; the weighted median
-   angle is the tilt (positive = the right end lower, image coordinates). None when no such
-   segment exists, so a busy frame without a horizon makes no claim.
+3. **Level-edge tilt** (``horizon_tilt_deg``). Probabilistic Hough segments on a Canny map;
+   segments at least 40 % of the frame width long and within 10 degrees of level vote with their
+   length; the weighted median angle is the tilt (positive = the right end lower, image
+   coordinates). None when no such segment exists. The edge may be a horizon, a table top, a
+   shelf or a window frame in perspective: it is "the longest near-level edge", and only the
+   coaching layer decides whether straightening is wanted.
 4. **Surface shares.** 32-px blocks classed as edge (Canny pixels present), texture (high-passed
    std above 4 levels) or flat; the three shares sum to one.
 5. **Focus split** (``focus_split``) on the per-edge MTF50 values: a one-dimensional two-means
@@ -43,7 +46,7 @@ class StructureResult:
     focus_peak_cell: tuple = (0, 0)
     focus_region_fraction: float = float("nan")
     focus_centroid: tuple = (float("nan"), float("nan"))    # normalised x, y of the detail centroid
-    composition_thirds_distance: float = float("nan")      # frame-diagonal units
+    composition_thirds_distance: float = float("nan")      # 0 = on a thirds point, 1 = frame centre
     orientation_horizontal_share: float = float("nan")
     orientation_vertical_share: float = float("nan")
     orientation_diagonal_share: float = float("nan")
@@ -107,7 +110,8 @@ def analyze_structure(rgb8: np.ndarray, grid: tuple[int, int] = GRID) -> Structu
         ncy = float(((cy + 0.5) / rows * wts).sum() / wts.sum())
         res.focus_centroid = (ncx, ncy)
         thirds = [(x, y) for x in (1 / 3, 2 / 3) for y in (1 / 3, 2 / 3)]
-        res.composition_thirds_distance = float(min(np.hypot(ncx - x, ncy - y) for x, y in thirds) / np.sqrt(2.0))
+        centre_to_thirds = np.hypot(1 / 6, 1 / 6)
+        res.composition_thirds_distance = float(min(np.hypot(ncx - x, ncy - y) for x, y in thirds) / centre_to_thirds)
 
     # 2. orientation
     gx = cv2.Sobel(Y, cv2.CV_32F, 1, 0, ksize=3)

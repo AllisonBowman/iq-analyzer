@@ -135,3 +135,27 @@ sharpness figure, the median relative width of the interval on the median MTF50 
 edge count, 0.59 with 3-5 edges, 0.64 with 6-10, 0.40 with more than 10. A per-image sharpness figure
 from natural edges is therefore good to about +/- 30 %, and the "sharpest image" rankings in report.md
 should be read as bands, not an order; the per-camera medians over many images are much tighter.
+
+## 7. Structure of the frames (fourth run, 2026-10-15, 978 s, 0 failures)
+
+`iqa/structure.py` adds a 4x6 focus map, the detail centroid and its distance from the rule-of-thirds
+points, orientation shares, the tilt of the longest near-level edge, surface shares, and a two-cluster
+in-focus/background split of the edge MTF50s (the review's open item). Every earlier column is
+unchanged. On this library:
+
+- **Subjects, not fields.** The median focus fraction is 0.25: in 168 of 389 frames the fine detail
+  occupies under a quarter of the 4x6 grid (a subject against a smooth or blurred field); only 7
+  frames are sharp almost everywhere (fraction > 0.8).
+- **Composition.** With the thirds distance in centre-to-thirds units (0 on a point, 1 at the frame
+  centre), 49 frames put the detail on a thirds point (< 0.35), 93 centre it or push it to an edge
+  (> 0.75), median 0.63. (The first scaling, in frame-diagonal units, called 342 of 389 "on a thirds
+  point" because the frame centre itself scored 0.17; the unit was changed, the stored numbers rescaled
+  by the constant 6.0 and the CSV rebuilt. It is a unit change, not a measurement change.)
+- **Level edges.** A near-level edge at least 40 % of the width long exists in 177 frames; its median
+  |tilt| is 2.3 degrees and 129 are tilted a degree or more. Most of those are not horizons: table
+  edges, shelves and the whiteboard frame seen in perspective (the walkthrough photo reads 6.9
+  degrees on the board's edge). The column is therefore named "level-edge tilt" in the report and the
+  app, and straightening advice is offered, not asserted.
+- **Shallow depth of field.** Of the 52 frames with five or more measured edges, 34 split cleanly into
+  a sharp and a soft group; for those the p80 figure is the subject and the median mixes in the
+  background, as the report's how-to-read section now says.

@@ -2,15 +2,15 @@ import Foundation
 
 /// Plain-language readings of the analyzer's structure fields. Pure functions of one photo.
 enum Structure {
-    static let thirdsPointDistance = 0.15
+    static let thirdsPointDistance = 0.35
 
     static let missingText = "Structure analysis needs a results file from iqa 0.2 or later; re-run Analyze."
 
     static let focusFractionDefinition = "The share of a 4 by 6 grid over the frame whose cells hold at least half of the frame's peak fine detail. A small value means a subject against a smooth or blurred field; a value near 1 means the frame is sharp everywhere."
     static let focusPositionDefinition = "Where that fine detail sits, measured from the top-left corner of the frame (0 to 1 across and down). The map above shades each cell by how much fine detail it holds."
-    static let thirdsDefinition = "Distance from the spot where the detail sits to the nearest rule-of-thirds point, in frame-diagonal units. Under 0.15 counts as on a thirds point."
+    static let thirdsDefinition = "Distance from the spot where the detail sits to the nearest rule-of-thirds point: 0 on the point, 1 at the frame centre, about 2 in a corner. Under 0.35 counts as on a thirds point; above 0.75 the subject is centred or near an edge."
     static let orientationDefinition = "How much of the strong edge energy runs horizontally, vertically or diagonally. It describes the lines in the scene (horizons and walls are horizontal or vertical), not quality."
-    static let horizonDefinition = "Tilt of a long, nearly level edge, in degrees. Positive means the right end is lower. Under 0.5 degrees is excellent, under 1 good, under 2 fair, otherwise poor."
+    static let horizonDefinition = "Tilt of the longest nearly level edge in the picture, in degrees: a horizon, but also a table top, a shelf or a window frame seen in perspective. Positive means the right end is lower. Under 0.5 degrees is excellent, under 1 good, under 2 fair, otherwise poor. Straighten only when that edge should be level."
     static let surfaceDefinition = "What the picture surface is made of: flat areas (sky, walls), fine texture (foliage, fabric) and strong edges. The three shares add up to 100 %."
     static let splitDefinition = "When the measured edges split cleanly into a sharp group and a soft group (a shallow depth-of-field frame), this is the sharpness of each group in cycles per pixel and the share of edges in the sharp group. The median over all edges then blends subject and background."
 
