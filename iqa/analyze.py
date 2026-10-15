@@ -8,6 +8,7 @@ from .edges import lw_per_ph, measure_natural_edges
 from .exposure import analyze_exposure
 from .imageio import LoadedImage, load_image
 from .noise import analyze_noise
+from .structure import analyze_structure, focus_split
 
 META_KEYS = ("format", "camera_make", "camera_model", "lens", "iso", "exposure_s",
              "f_number", "focal_mm", "datetime", "width", "height", "color_profile")
@@ -24,6 +25,11 @@ def analyze_loaded(img: LoadedImage, max_rois: int = 30) -> dict:
     noise = analyze_noise(img.rgb8)
     rec.update(noise.as_dict())
     rec.update(analyze_exposure(img.rgb8).as_dict())
+    rec.update(analyze_structure(img.rgb8).as_dict())
+    split = focus_split([e.sfr.mtf50 for e in edges.edges]) if edges.n_measured else None
+    rec["mtf50_infocus_cpp"] = split["infocus_mtf50"] if split else float("nan")
+    rec["mtf50_background_cpp"] = split["background_mtf50"] if split else float("nan")
+    rec["infocus_edge_share"] = split["infocus_share"] if split else float("nan")
     rec["analysis_s"] = round(time.time() - t0, 2)
     rec["_edges"] = edges
     rec["_noise"] = noise
