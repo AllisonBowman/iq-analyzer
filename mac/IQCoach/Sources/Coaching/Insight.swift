@@ -41,6 +41,9 @@ struct Insight: Identifiable, Hashable, Sendable {
     let why: String
     let actions: [String]
     let evidence: [EvidenceItem]
+    /// `file` values of up to four photos that best show the point, and a caption for each (the value that made it an example).
+    var exampleFiles: [String] = []
+    var exampleCaptions: [String] = []
 
     /// The "Based on n photos" footer: the largest evidence count.
     var basedOn: Int { evidence.map(\.n).max() ?? 0 }

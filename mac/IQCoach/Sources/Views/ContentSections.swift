@@ -121,6 +121,7 @@ struct FocusMapView: View {
     let map: [[Double]]
     var aspect: Double = 1.5
     var salientBox: CGRect?
+    var maxWidth: CGFloat = 330
 
     var body: some View {
         Canvas { ctx, size in
@@ -143,7 +144,7 @@ struct FocusMapView: View {
             }
         }
         .aspectRatio(aspect, contentMode: .fit)
-        .frame(maxWidth: 330)
+        .frame(maxWidth: maxWidth)
         .accessibilityHidden(true)
     }
 }
@@ -158,20 +159,25 @@ struct StructureSectionBody: View {
             Label(Structure.missingText, systemImage: "info.circle").foregroundStyle(.secondary)
         } else {
             VStack(alignment: .leading, spacing: 10) {
-                if let map = photo.structureFocusMap {
-                    FocusMapView(map: map, aspect: aspect, salientBox: salientBox)
-                    if salientBox != nil {
-                        Text("Dashed box: the most eye-catching object, found by Apple's Vision framework.")
-                            .font(.caption).foregroundStyle(.secondary)
+                HStack(alignment: .top, spacing: 12) {
+                    if let map = photo.structureFocusMap {
+                        FocusMapView(map: map, aspect: aspect, salientBox: salientBox, maxWidth: 120)
+                            .frame(width: 120)
                     }
-                }
-                if let c = Structure.focusCaption(photo) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(c).fixedSize(horizontal: false, vertical: true)
-                        if let f = photo.structureFocusFraction, f < 0.8 { TextInfoButton(title: "Focus fraction", text: Structure.focusFractionDefinition + " " + Structure.focusPositionDefinition + " " + Structure.thirdsDefinition) }
-                        else { TextInfoButton(title: "Focus fraction", text: Structure.focusFractionDefinition) }
+                    VStack(alignment: .leading, spacing: 6) {
+                        if let c = Structure.focusCaption(photo) {
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Text(c).fixedSize(horizontal: false, vertical: true)
+                                if let f = photo.structureFocusFraction, f < 0.8 { TextInfoButton(title: "Focus fraction", text: Structure.focusFractionDefinition + " " + Structure.focusPositionDefinition + " " + Structure.thirdsDefinition) }
+                                else { TextInfoButton(title: "Focus fraction", text: Structure.focusFractionDefinition) }
+                            }
+                            .accessibilityElement(children: .combine)
+                        }
+                        if photo.structureFocusMap != nil, salientBox != nil {
+                            Text("Dashed box: the most eye-catching object, found by Apple's Vision framework.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                     }
-                    .accessibilityElement(children: .combine)
                 }
                 if let o = Structure.orientation(photo) {
                     rowView("Orientation", o, definition: Structure.orientationDefinition)
@@ -218,6 +224,8 @@ struct StructureSectionBody: View {
 struct CameraContentRow: View {
     let camera: CameraGroup
     @State private var top: [String] = []
+    @State private var bestPath: [String: String] = [:]
+    @Environment(AppModel.self) private var model: AppModel?
     @State private var done = 0
     @State private var total = 0
     @Environment(\.isSnapshot) private var isSnapshot
@@ -239,12 +247,8 @@ struct CameraContentRow: View {
                     if top.isEmpty {
                         HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Reading \(done) of \(total) photos…").foregroundStyle(.secondary) }
                     } else {
-                        FlowLayout(spacing: 6) {
-                            ForEach(top, id: \.self) { l in
-                                Text(l.replacingOccurrences(of: "_", with: " ")).font(.callout)
-                                    .padding(.horizontal, 10).padding(.vertical, 3)
-                                    .background(.fill.tertiary, in: Capsule())
-                            }
+                        FlowLayout(spacing: 16) {
+                            ForEach(top, id: \.self) { l in labelWithPhoto(l) }
                         }
                         Text("Most common labels over the newest \(done) of this camera's photos. Identified on this Mac by Apple's Vision framework; nothing leaves the computer.")
                             .font(.caption).foregroundStyle(.secondary)
@@ -254,21 +258,46 @@ struct CameraContentRow: View {
             }
         }
         .task(id: camera.id) {
-            top = []; done = 0; total = 0
+            top = []; done = 0; total = 0; bestPath = [:]
             guard !isSnapshot else { return }
             let paths = Self.candidates(camera.photos)
             total = paths.count
             var counts: [String: (n: Int, conf: Double)] = [:]
+            var best: [String: (conf: Double, path: String)] = [:]
             for path in paths {
                 if Task.isCancelled { return }
+                // labels(path:) is cached per path by ContentIdentifier; its confidences also say which photo shows a label best.
                 if let labels = await ContentIdentifier.shared.labels(path: path) {
-                    for l in labels { let e = counts[l.label] ?? (0, 0); counts[l.label] = (e.n + 1, e.conf + l.confidence) }
+                    for l in labels {
+                        let e = counts[l.label] ?? (0, 0); counts[l.label] = (e.n + 1, e.conf + l.confidence)
+                        if l.confidence > (best[l.label]?.conf ?? -1) { best[l.label] = (l.confidence, path) }
+                    }
                 }
                 done += 1
-                if done % 5 == 0 || done == total { top = Self.rank(counts) }
+                if done % 5 == 0 || done == total { top = Self.rank(counts); bestPath = best.mapValues(\.path) }
             }
             top = Self.rank(counts)
+            bestPath = best.mapValues(\.path)
         }
+    }
+
+    /// A label capsule under the thumbnail of the photo that scored that label highest.
+    @ViewBuilder private func labelWithPhoto(_ l: String) -> some View {
+        let path = bestPath[l]
+        let photo = path.flatMap { p in camera.photos.first { $0.path == p } }
+        VStack(spacing: 6) {
+            Button { if let photo { model?.selectedPhotoID = photo.id } } label: {
+                PhotoThumb(path: path, maxPixel: 256).frame(width: 96, height: 96)
+            }
+            .buttonStyle(.plain)
+            .disabled(photo == nil)
+            .help(photo.map { "Show \($0.file), the photo that best matches \(l)" } ?? "")
+            Text(l.replacingOccurrences(of: "_", with: " ")).font(.callout)
+                .padding(.horizontal, 10).padding(.vertical, 3)
+                .background(.fill.tertiary, in: Capsule())
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(l.replacingOccurrences(of: "_", with: " ")), best example \(photo?.file ?? "none")")
     }
 
     static func rank(_ counts: [String: (n: Int, conf: Double)]) -> [String] {

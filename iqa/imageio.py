@@ -220,6 +220,9 @@ def load_image(path: str, max_side: int | None = None) -> LoadedImage:
         im = ImageOps.exif_transpose(im)
         if im.mode not in ("RGB",):
             im = im.convert("RGB")
+        # Saturation belongs to the file's own encoding: a Display P3 or Adobe RGB colour that lies
+        # outside sRGB clips to 255 in the conversion below and must not count as a blown highlight.
+        meta["native_clip_high_pct"], meta["native_clip_low_pct"] = native_clip_stats(np.asarray(im, dtype=np.uint8))
         im, meta["color_profile"] = _to_srgb(im)
         rgb8 = np.asarray(im, dtype=np.uint8)
         rgb8 = _downscale(rgb8, max_side)
@@ -230,6 +233,13 @@ def load_image(path: str, max_side: int | None = None) -> LoadedImage:
     lin_luma = (lin.astype(np.float32) @ LUMA_W).astype(np.float32)
     meta["width"], meta["height"] = int(rgb8.shape[1]), int(rgb8.shape[0])
     return LoadedImage(path=path, rgb8=rgb8, lin_luma=lin_luma, is_raw=is_raw, meta=meta)
+
+
+def native_clip_stats(rgb8: np.ndarray) -> tuple[float, float]:
+    """(% of pixels with any channel >= 254, % with all channels <= 1) in the array's own encoding."""
+    mx = rgb8.max(axis=2)
+    mn = rgb8.min(axis=2)
+    return float(100.0 * np.mean(mx >= 254)), float(100.0 * np.mean(mn <= 1))
 
 
 def rgb8_from_linear(lin: np.ndarray) -> np.ndarray:

@@ -24,7 +24,15 @@ def analyze_loaded(img: LoadedImage, max_rois: int = 30) -> dict:
     rec["mtf50_p80_lwph"] = lw_per_ph(edges.mtf50_p80, img.height) if edges.n_measured else float("nan")
     noise = analyze_noise(img.rgb8)
     rec.update(noise.as_dict())
-    rec.update(analyze_exposure(img.rgb8).as_dict())
+    exposure = analyze_exposure(img.rgb8).as_dict()
+    if img.meta.get("native_clip_high_pct") is not None:
+        # Report clipping as the file encodes it; the sRGB-measured excess is gamut clipping.
+        exposure["clip_gamut_pct"] = max(0.0, exposure["clip_high_pct"] - img.meta["native_clip_high_pct"])
+        exposure["clip_high_pct"] = img.meta["native_clip_high_pct"]
+        exposure["clip_low_pct"] = img.meta["native_clip_low_pct"]
+    else:
+        exposure["clip_gamut_pct"] = 0.0
+    rec.update(exposure)
     rec.update(analyze_structure(img.rgb8).as_dict())
     split = focus_split([e.sfr.mtf50 for e in edges.edges]) if edges.n_measured else None
     rec["mtf50_infocus_cpp"] = split["infocus_mtf50"] if split else float("nan")

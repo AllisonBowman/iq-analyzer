@@ -32,6 +32,7 @@ struct CameraReportView: View {
             if let a = s.firstDate, let b = s.lastDate {
                 Text("Shot \(Fmt.date(a)) to \(Fmt.date(b))").font(.callout).foregroundStyle(.secondary)
             }
+            RecentPhotoStrip(camera: camera, selectedPhotoID: $selectedPhotoID).padding(.top, 8)
         }
     }
 
@@ -77,7 +78,7 @@ struct CameraReportView: View {
                 ContentUnavailableView("Not enough photos yet", systemImage: "camera.metering.unknown",
                                        description: Text("Coaching needs at least 5 photos from a camera; this one has \(camera.photos.count)."))
             } else {
-                ForEach(insights) { InsightCard(insight: $0) }
+                ForEach(insights) { InsightCard(insight: $0, camera: camera) }
             }
         }
     }
@@ -90,3 +91,40 @@ struct CameraReportView: View {
     }
 }
 
+
+extension CameraGroup {
+    /// Photos that have a file path, newest first.
+    func recentPhotos(_ limit: Int) -> [PhotoRecord] {
+        photos.filter { $0.path != nil }
+            .sorted { ($0.date ?? .distantPast) != ($1.date ?? .distantPast) ? ($0.date ?? .distantPast) > ($1.date ?? .distantPast) : $0.file < $1.file }
+            .prefix(limit).map { $0 }
+    }
+
+    /// The newest photo with a path: stands in for the camera in the library overview.
+    var representativePhoto: PhotoRecord? { recentPhotos(1).first }
+}
+
+/// Up to eight recent photos of the camera at 96 pt; choosing one opens its measurements.
+struct RecentPhotoStrip: View {
+    let camera: CameraGroup
+    @Binding var selectedPhotoID: PhotoRecord.ID?
+    @Environment(\.isSnapshot) private var isSnapshot
+    static let count = 8
+
+    var body: some View {
+        let photos = camera.recentPhotos(Self.count)
+        if !photos.isEmpty {
+            let strip = HStack(spacing: 10) {
+                ForEach(photos) { p in
+                    Button { selectedPhotoID = p.id } label: {
+                        PhotoThumb(path: p.path, maxPixel: 256).frame(width: 96, height: 96)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Show \(p.file)")
+                    .accessibilityLabel("Open \(p.file)")
+                }
+            }
+            if isSnapshot { strip } else { ScrollView(.horizontal, showsIndicators: false) { strip } }
+        }
+    }
+}

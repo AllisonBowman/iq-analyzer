@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LibraryOverviewView: View {
     let library: PhotoLibrary
+    @Environment(AppModel.self) private var model: AppModel?
     @Environment(\.isSnapshot) private var isSnapshot
 
     private static func cell(_ metric: Metric, _ v: Double?) -> String {
@@ -24,11 +25,34 @@ struct LibraryOverviewView: View {
                     SectionHeader(title: "Cameras", subtitle: "Report-card numbers for every camera. Pick one in the sidebar for its coaching.")
                     cameraTable
                 }
+                if library.cameras.contains(where: { $0.representativePhoto != nil }) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        SectionHeader(title: "Your cameras", subtitle: "Each camera's newest photo. Choose one to open that camera's report.")
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 16, alignment: .top)], alignment: .leading, spacing: 16) {
+                            ForEach(library.cameras) { cameraTile($0) }
+                        }
+                    }
+                }
                 LibrarySNRChart(cameras: library.cameras)
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    private func cameraTile(_ c: CameraGroup) -> some View {
+        Button { model?.sidebarSelection = .camera(c.model); model?.selectedPhotoID = nil } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                PhotoThumb(path: c.representativePhoto?.path, maxPixel: 400, cornerRadius: 8).frame(width: 160, height: 160)
+                Text(c.model).font(.callout.weight(.semibold)).lineLimit(1)
+                Text(Fmt.count(c.photos.count, "photo")).font(.caption).foregroundStyle(.secondary)
+            }
+            .frame(width: 160, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+        .help("Open the \(c.model) report")
+        .accessibilityLabel("\(c.model), \(Fmt.count(c.photos.count, "photo"))")
+        .accessibilityHint("Opens this camera's report")
     }
 
     @ViewBuilder private var cameraTable: some View {

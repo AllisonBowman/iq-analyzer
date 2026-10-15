@@ -54,3 +54,26 @@ def test_exposure_clipping_counts():
     assert 0.3 < x.clip_low_pct < 1.0
     assert 0.95 < x.wb_r_over_g < 1.05
     assert x.wb_b_over_g > 1.02  # the scene is slightly blue
+
+
+def test_clipping_is_measured_before_the_profile_conversion(tmp_path, monkeypatch):
+    """A wide-gamut colour that saturates only after conversion to sRGB is not a blown highlight."""
+    from PIL import Image
+    import iqa.imageio as io
+    from iqa.analyze import analyze_file
+    rgb = np.full((200, 200, 3), 120, dtype=np.uint8)
+    rgb[:100, :, :] = (230, 40, 40)          # saturated but not clipped in the file's own encoding
+    rgb[150:, 150:, :] = 255                  # a genuinely blown block: 6.25 % of pixels
+    path = tmp_path / "p3.png"
+    Image.fromarray(rgb).save(path)
+
+    def fake_to_srgb(im):                     # stand-in for a Display P3 -> sRGB conversion that clips red
+        a = np.asarray(im).copy()
+        red = (a[..., 0] > 200) & (a[..., 1] < 100)
+        a[red, 0] = 255
+        return Image.fromarray(a), "Display P3 -> sRGB"
+    monkeypatch.setattr(io, "_to_srgb", fake_to_srgb)
+    rec = analyze_file(str(path))
+    assert abs(rec["clip_high_pct"] - 6.25) < 0.01, rec["clip_high_pct"]
+    assert abs(rec["clip_gamut_pct"] - 50.0) < 0.01, rec["clip_gamut_pct"]   # the red half clipped only in sRGB
+    assert rec["clip_low_pct"] == 0.0

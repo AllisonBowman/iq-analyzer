@@ -28,7 +28,7 @@ CSV_COLUMNS = [
     "snr_midgrey_extrapolated", "snr_nearest_bin_level",
     "dr_snr1_stops", "dr_snr2_stops", "dr_snr4_stops", "dr_snr10_stops",
     "dr_snr1_lower_bound", "dr_snr2_lower_bound", "dr_snr4_lower_bound", "dr_snr10_lower_bound",
-    "clip_high_pct", "clip_low_pct", "mean_luma", "luma_p1", "luma_p50", "luma_p99",
+    "clip_high_pct", "clip_low_pct", "clip_gamut_pct", "mean_luma", "luma_p1", "luma_p50", "luma_p99",
     "tonal_range_stops", "colorfulness", "wb_r_over_g", "wb_b_over_g", "wb_r_over_g_stops",
     "wb_b_over_g_stops", "saturation_mean", "analysis_s", "path",
 ]
@@ -330,7 +330,7 @@ def write_markdown(records: list[dict], charts: list[str], path: str, title: str
               "- **Overshoot** is how far the edge profile overshoots its bright plateau, in % of the step: a direct measure of sharpening halo. MTF50P (relative to the MTF peak) is the sharpening-robust companion of MTF50.",
               "- **SNR at mid-grey** is 20·log10(118 / noise std) on the 8-bit luminance of flat patches; 35+ dB is clean, below 25 dB is visibly noisy. 8-bit quantisation alone caps it at about 52 dB. The figure is output-referred: noise reduction and JPEG/HEIC compression lower it as much as the sensor does, so SNR-vs-ISO across formats is partly a chart of processing. `noise_whiteness` near 0.14 means white noise; 0.3+ means the noise has been smoothed by NR or compression. `noise_spectral_peak` is how far the strongest frequency in the averaged patch spectrum stands above its surroundings: about 1 for noise, above 8 (`noise_periodic_suspect`) the flat patches contain a repeating pattern (a screen's pixel grid, a weave, halftone) at `noise_periodic_freq_cpp` cycles per pixel, and the SNR is of the pattern, not the sensor.",
               "- **Dynamic range** is output-referred: the stops between near-white and the darkest level whose scene-linear SNR still exceeds the threshold. A JPEG's tone curve bounds it, and the floor can only be found in frames that contain near-black flat areas; 'lower bound' rows are excluded from the medians.",
-              "- **Clipping** is the share of pixels at the top (any channel >= 254) or bottom (all channels <= 1) of the range.",
+              "- **Clipping** is the share of pixels at the top (any channel >= 254) or bottom (all channels <= 1) of the range, measured in the file's own encoding before any profile conversion. `clip_gamut_pct` is the extra share that saturates only after converting Display P3 or Adobe RGB to sRGB: colour outside the sRGB gamut, not lost detail.",
               "- **White balance** is the gray-world ratio of linear channel means (and in stops); it describes the scene's cast as rendered, which for sunsets and underwater work is intent, not error.",
               ""]
     with open(path, "w") as fh:

@@ -16,7 +16,10 @@ enum SnapshotRunner {
             let library = PhotoLibrary(sourceName: URL(fileURLWithPath: input).lastPathComponent, photos: photos)
             let dir = URL(fileURLWithPath: outputDirectory, isDirectory: true)
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            guard let cam = library.cameras.first, let photo = cam.photos.sorted(by: { $0.file < $1.file }).first else {
+            // The photo screen shows a clipped photo that has a file, so the Clipping overlay has something to show:
+            // of the ten photos the analyzer says are most clipped, the one whose 800 px thumbnail really has the most blown pixels.
+            guard let cam = library.cameras.first(where: { $0.representativePhoto != nil }) ?? library.cameras.first,
+                  let photo = Self.mostVisiblyClipped(library.photos) ?? cam.photos.sorted(by: { $0.file < $1.file }).first else {
                 FileHandle.standardError.write(Data("No photos in \(input)\n".utf8)); return 1
             }
             var written: [URL] = []
@@ -27,7 +30,7 @@ enum SnapshotRunner {
                 CameraReportView(camera: cam, selectedPhotoID: .constant(nil))
             }, to: dir.appendingPathComponent("camera-\(slug(cam.model)).png")))
             written.append(try render(AnyView(
-                PhotoDetailView(photo: photo)
+                PhotoDetailView(photo: photo, initialOverlay: .clipping)
                     .frame(width: 760)
                     .padding(.vertical, 24)
                     .frame(width: width)
@@ -50,6 +53,15 @@ enum SnapshotRunner {
             FileHandle.standardError.write(Data("snapshot failed: \(error)\n".utf8))
             return 1
         }
+    }
+
+    private static func mostVisiblyClipped(_ photos: [PhotoRecord]) -> PhotoRecord? {
+        let candidates = photos.filter { $0.path != nil }.sorted { ($0.clipHighPct ?? 0) > ($1.clipHighPct ?? 0) }.prefix(10)
+        func blown(_ p: PhotoRecord) -> Int {
+            guard let img = ThumbnailStore.loadSynchronously(path: p.path ?? "", maxPixel: OverlayImage.loadPixel) else { return 0 }
+            return ClippingMask.make(from: img)?.highCount ?? 0
+        }
+        return candidates.max { blown($0) < blown($1) }
     }
 
     private static func slug(_ s: String) -> String {

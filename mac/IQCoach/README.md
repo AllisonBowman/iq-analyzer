@@ -34,7 +34,7 @@ Press Validate: it checks the file exists and that `python -c "import iqa"` work
 build/Build/Products/Debug/IQCoach.app/Contents/MacOS/IQCoach --snapshot ../../results/results.json /tmp/iqcoach-snaps
 ```
 
-Writes `library.png`, `camera-<first camera>.png`, `photo-<first photo>.png`, `glossary.png` at 1400 pt wide, 2x. Tall screens are drawn unrolled to full height. AppKit-backed controls (Table, List, GroupBox content, segmented Picker, Form) cannot draw off-screen, so snapshots substitute plain-view equivalents; the live app uses the real controls.
+Writes `library.png`, `camera-<first camera>.png`, `photo-<the most visibly clipped photo>.png` (rendered with the Clipping overlay selected), `glossary.png` at 1400 pt wide, 2x. Tall screens are drawn unrolled to full height. AppKit-backed controls (Table, List, GroupBox content, segmented Picker, Form) cannot draw off-screen, so snapshots substitute plain-view equivalents; the live app uses the real controls.
 
 ## Layout
 

@@ -3,16 +3,21 @@ import SwiftUI
 struct PhotoDetailView: View {
     let photo: PhotoRecord
     @State private var editor: Editor = .applePhotos
-    @State private var image: CGImage?
+    @State private var overlay: PhotoOverlay
     @State private var content: ContentState = .idle
     @Environment(\.isSnapshot) private var isSnapshot
+
+    init(photo: PhotoRecord, initialOverlay: PhotoOverlay = .none) {
+        self.photo = photo
+        _overlay = State(initialValue: initialOverlay)
+    }
 
     private var advice: [EditingAdvice] { EditingRules.advice(for: photo) }
 
     var body: some View {
         formOrStack {
             block(nil) {
-                thumbnail
+                imageSection
                 VStack(alignment: .leading, spacing: 4) {
                     Text(photo.file).font(.headline).lineLimit(2).truncationMode(.middle)
                     Text([photo.camera, photo.lens].compactMap { $0 }.joined(separator: " · ")).font(.callout).foregroundStyle(.secondary)
@@ -49,10 +54,7 @@ struct PhotoDetailView: View {
                 }
             }
         }
-        .task(id: photo.id) {
-            image = nil
-            if !isSnapshot { image = await ThumbnailLoader.load(path: photo.path) }
-        }
+        .onChange(of: photo.id) { overlay = .none }
         .task(id: photo.id) {
             content = .idle
             guard !isSnapshot else { return }
@@ -96,25 +98,14 @@ struct PhotoDetailView: View {
         return parts.joined(separator: " · ")
     }
 
-    @ViewBuilder private var thumbnail: some View {
-        if let image {
-            Image(decorative: image, scale: 1)
-                .resizable().scaledToFit()
-                .frame(maxHeight: 280)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .accessibilityLabel("Thumbnail of \(photo.file)")
-        } else {
-            VStack(spacing: 8) {
-                Image(systemName: "photo").font(.largeTitle).foregroundStyle(.secondary)
-                Text(photo.file).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-                Text(photo.path == nil ? "No file path in these results"
-                     : (FileManager.default.fileExists(atPath: photo.path ?? "") ? "Loading preview…" : "File not found at its recorded path"))
-                    .font(.caption2).foregroundStyle(.secondary)
+    /// The photo is the centre of the screen: large, with an overlay chooser and a caption under it.
+    private var imageSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            OverlayImage(path: photo.path, overlay: overlay, photo: photo, salientBox: content.summary?.salientBox)
+            OverlayPicker(selection: $overlay)
+            if let caption = OverlayImage.caption(for: overlay, photo: photo, hasSalientBox: content.summary?.salientBox != nil) {
+                Text(caption).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
-            .frame(maxWidth: .infinity, minHeight: 120)
-            .background(.fill.quaternary, in: RoundedRectangle(cornerRadius: 8))
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("No thumbnail available for \(photo.file)")
         }
     }
 
@@ -144,17 +135,20 @@ struct PhotoDetailView: View {
     }
 
     @ViewBuilder private func adviceCard(_ a: EditingAdvice) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(a.finding).fixedSize(horizontal: false, vertical: true)
-            Text("In \(editor.rawValue)").font(.subheadline.weight(.semibold))
-            Text(a.text(for: editor)).font(.callout).fixedSize(horizontal: false, vertical: true)
-            if let c = a.caution {
-                Label(c, systemImage: "exclamationmark.triangle")
-                    .font(.callout).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+        HStack(alignment: .top, spacing: 12) {
+            OverlayImage(path: photo.path, overlay: a.overlay(for: photo), photo: photo, salientBox: nil, boxSize: 96)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(a.finding).fixedSize(horizontal: false, vertical: true)
+                Text("In \(editor.rawValue)").font(.subheadline.weight(.semibold))
+                Text(a.text(for: editor)).font(.callout).fixedSize(horizontal: false, vertical: true)
+                if let c = a.caution {
+                    Label(c, systemImage: "exclamationmark.triangle")
+                        .font(.callout).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
+            .accessibilityElement(children: .combine)
         }
-        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder private func row(_ m: Metric) -> some View {
