@@ -81,6 +81,37 @@ final class AppModel {
         }
     }
 
+    /// Copies the newest `count` camera photos out of the Photos library (PhotoKit, read-only) and
+    /// analyses the copies. Paths are kept because the copies are the app's own files.
+    func analyzeFromPhotos(count: Int) {
+        let defaults = UserDefaults.standard
+        let runner = AnalyzerRunner(python: defaults.string(forKey: "pythonPath") ?? Self.defaultPython,
+                                    repo: defaults.string(forKey: "repoPath") ?? Self.defaultRepo)
+        progress = AnalysisProgress()
+        analysisTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                _ = try await runner.validate()
+                let folder = try await PhotosImporter.exportNewest(count: count) { line in
+                    Task { @MainActor in self.record(line: line) }
+                }
+                let json = try await runner.analyze(folder: folder, keepPaths: true) { line in
+                    Task { @MainActor in self.record(line: line) }
+                }
+                self.progress = nil
+                self.load(url: json)
+            } catch {
+                self.progress?.failure = error.localizedDescription
+                self.progress?.finished = true
+            }
+        }
+    }
+
+    static var photosCount: Int {
+        let n = UserDefaults.standard.integer(forKey: "photosCount")
+        return n > 0 ? n : 40
+    }
+
     private func record(line: String) {
         guard progress != nil else { return }
         progress?.lines.append(line)

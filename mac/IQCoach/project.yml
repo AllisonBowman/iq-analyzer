@@ -23,6 +23,7 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: IQ Coach
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.photography
         INFOPLIST_KEY_NSHumanReadableCopyright: "MIT licence"
+        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "IQ Coach copies your newest camera photos into its own folder so the analyzer can measure them. Your library is only read, never changed."
         ENABLE_APP_SANDBOX: NO
         ENABLE_HARDENED_RUNTIME: NO
         CODE_SIGN_IDENTITY: "-"

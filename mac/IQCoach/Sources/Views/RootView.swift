@@ -33,6 +33,8 @@ struct RootView: View {
                     .help("Open a results.json (⌘O)")
                 Button { model.isChoosingFolder = true } label: { Label("Analyze Folder…", systemImage: "folder.badge.gearshape") }
                     .help("Run the analyzer on a folder of photos (⇧⌘O)")
+                Button { model.analyzeFromPhotos(count: AppModel.photosCount) } label: { Label("Analyze from Photos", systemImage: "photo.on.rectangle.angled") }
+                    .help("Copy the \(AppModel.photosCount) newest camera photos out of Photos and analyze them (⇧⌘P); the count is in Settings")
                 if let cam = model.selectedCamera {
                     ShareLink(item: MarkdownExport.coaching(for: cam, insights: CoachingEngine.insights(for: cam)),
                               subject: Text("Coaching for \(cam.model)")) {
@@ -57,7 +59,10 @@ struct RootView: View {
         .alert("Something went wrong", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
             Button("OK", role: .cancel) {}
         } message: { Text(model.errorMessage ?? "") }
-        .task { await WindowShots.runIfRequested(model: model) }
+        .task {
+            if let n = LaunchOptions.analyzePhotosCount { model.analyzeFromPhotos(count: n) }
+            await WindowShots.runIfRequested(model: model)
+        }
     }
 
     @ViewBuilder private func contentColumn(_ library: PhotoLibrary) -> some View {
@@ -117,6 +122,7 @@ struct EmptyStateView: View {
             Button("Open Results…") { model.isImporting = true }
                 .buttonStyle(.borderedProminent)
             Button("Analyze Folder…") { model.isChoosingFolder = true }
+            Button("Analyze \(AppModel.photosCount) Newest from Photos") { model.analyzeFromPhotos(count: AppModel.photosCount) }
         }
         .padding(24)
     }

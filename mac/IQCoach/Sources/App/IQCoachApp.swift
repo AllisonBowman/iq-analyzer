@@ -32,6 +32,8 @@ struct AppCommands: Commands {
                 .keyboardShortcut("o", modifiers: .command)
             Button("Analyze Folder…") { model.isChoosingFolder = true }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
+            Button("Analyze \(AppModel.photosCount) Newest from Photos") { model.analyzeFromPhotos(count: AppModel.photosCount) }
+                .keyboardShortcut("p", modifiers: [.command, .shift])
         }
         CommandGroup(replacing: .help) {
             Button("Glossary") { openWindow(id: "glossary") }

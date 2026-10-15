@@ -42,13 +42,13 @@ struct AnalyzerRunner: Sendable {
     }
 
     /// Analyses `folder` and returns the results.json it wrote. `onLine` receives each output line.
-    func analyze(folder: URL, onLine: @escaping @Sendable (String) -> Void) async throws -> URL {
+    func analyze(folder: URL, keepPaths: Bool = false, onLine: @escaping @Sendable (String) -> Void) async throws -> URL {
         _ = try await validate()
         let stamp = Date.now.formatted(.iso8601.year().month().day().dateSeparator(.omitted).time(includingFractionalSeconds: false).timeSeparator(.omitted))
         let out = Self.runsDirectory().appendingPathComponent(stamp, isDirectory: true)
         try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
         let result = try await Self.run(Self.expand(python),
-                                        ["-m", "iqa", "analyze", folder.path, "-r", "--out", out.path, "--no-paths"],
+                                        ["-m", "iqa", "analyze", folder.path, "-r", "--out", out.path] + (keepPaths ? [] : ["--no-paths"]),
                                         cwd: Self.expand(repo), onLine: onLine)
         guard result.status == 0 else {
             throw AnalyzerError.failed(result.status, String(result.output.split(separator: "\n").suffix(3).joined(separator: " ")))
