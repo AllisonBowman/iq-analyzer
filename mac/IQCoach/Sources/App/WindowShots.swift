@@ -46,11 +46,13 @@ enum WindowShots {
     }
 
     private static func capture(to url: URL) {
-        guard let w = NSApp.windows.first(where: { $0.isVisible }), let v = w.contentView,
-              let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds) else { print("no window to capture"); return }
-        v.cacheDisplay(in: v.bounds, to: rep)
-        if let png = rep.representation(using: .png, properties: [:]) {
-            try? png.write(to: url); print("wrote \(url.path)")
-        }
+        guard let w = NSApp.windows.first(where: { $0.isVisible }) else { trace("no window to capture"); return }
+        // The system screenshot of the window: SwiftUI's layer-backed split view does not draw through
+        // cacheDisplay, and this is what the person actually sees.
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+        p.arguments = ["-x", "-o", "-l", String(w.windowNumber), url.path]
+        do { try p.run(); p.waitUntilExit(); trace("wrote \(url.path) (status \(p.terminationStatus))") }
+        catch { trace("screencapture failed: \(error)") }
     }
 }

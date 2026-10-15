@@ -42,3 +42,12 @@ Writes `library.png`, `camera-<first camera>.png`, `photo-<first photo>.png`, `g
 - `Sources/Coaching`: the ten camera rules and nine photo editing rules, pure functions.
 - `Sources/Views`, `Sources/App`, `Sources/Support`: UI, app entry and snapshot runner, analyzer process and formatting.
 - `Tests/IQCoachTests`: 42 Swift Testing tests (every rule fires and stays quiet, band boundaries, decoding).
+
+## Live-window captures
+
+`IQCoach --window-shots results.json <outdir>` runs the real app, opens the library, the first camera
+and its first photo, and screenshots the window with `screencapture -l` after each step. It needs an
+awake, unlocked display and Screen Recording permission for IQCoach (System Settings > Privacy &
+Security > Screen Recording); without the permission `screencapture` exits with status 1 and
+`window-shots.log` says so. The in-process `cacheDisplay` route was tried first and draws only the
+detail pane: SwiftUI's split view does not render through it.
