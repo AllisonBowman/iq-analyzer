@@ -3,7 +3,6 @@ import SwiftUI
 struct SettingsView: View {
     @AppStorage("pythonPath") private var pythonPath = AppModel.defaultPython
     @AppStorage("repoPath") private var repoPath = AppModel.defaultRepo
-    @AppStorage("photosCount") private var photosCount = 40
     @State private var result: String?
     @State private var failed = false
     @State private var checking = false
@@ -17,13 +16,6 @@ struct SettingsView: View {
                     .help("The repository folder that contains the iqa package")
             } footer: {
                 Text("Analyze Folder runs python -m iqa analyze with this interpreter. Create the environment with python3 -m venv .venv and pip install -r requirements.txt in the repository.")
-                    .foregroundStyle(.secondary)
-            }
-            Section {
-                Stepper("Photos to analyze from the library: \(photosCount)", value: $photosCount, in: 5...500, step: 5)
-                    .help("Analyze from Photos copies this many of the newest camera photos (screenshots skipped) into IQ Coach's own folder")
-            } footer: {
-                Text("The copies live in ~/Library/Application Support/IQCoach/photos. The Photos library itself is only read.")
                     .foregroundStyle(.secondary)
             }
             Section {

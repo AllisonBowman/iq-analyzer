@@ -1,5 +1,8 @@
 import Foundation
 import Photos
+import PhotosUI
+import SwiftUI
+import UniformTypeIdentifiers
 
 enum PhotosImportError: LocalizedError {
     case denied(PHAuthorizationStatus)
@@ -67,6 +70,31 @@ struct PhotosImporter: Sendable {
         }
         guard written > 0 else { throw PhotosImportError.nothingToExport }
         onLine("exported \(written) photos to \(dir.path)")
+        return dir
+    }
+
+    /// Copies the photos chosen in the system picker (which needs no library permission) into the
+    /// app's folder. Each item arrives as its original data with EXIF intact.
+    static func export(picked items: [PhotosPickerItem], onLine: @escaping @Sendable (String) -> Void) async throws -> URL {
+        guard !items.isEmpty else { throw PhotosImportError.nothingToExport }
+        let dir = exportDirectory()
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        var written = 0
+        for (i, item) in items.enumerated() {
+            let type = item.supportedContentTypes.first(where: { $0.conforms(to: .image) }) ?? .jpeg
+            let ext = type.preferredFilenameExtension ?? "jpg"
+            let name = String(format: "%03d-photo.%@", i + 1, ext)
+            onLine("[\(i + 1)/\(items.count)] copying \(name)")
+            do {
+                guard let data = try await item.loadTransferable(type: Data.self) else { onLine("  skipped: no data"); continue }
+                try data.write(to: dir.appendingPathComponent(name))
+                written += 1
+            } catch {
+                onLine("  skipped \(name): \(error.localizedDescription)")
+            }
+        }
+        guard written > 0 else { throw PhotosImportError.nothingToExport }
+        onLine("copied \(written) photos to \(dir.path)")
         return dir
     }
 

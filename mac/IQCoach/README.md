@@ -51,3 +51,12 @@ awake, unlocked display and Screen Recording permission for IQCoach (System Sett
 Security > Screen Recording); without the permission `screencapture` exits with status 1 and
 `window-shots.log` says so. The in-process `cacheDisplay` route was tried first and draws only the
 detail pane: SwiftUI's split view does not render through it.
+
+## Photos
+
+"Choose Photos to Analyze…" (⇧⌘P, also on the toolbar and the empty screen) opens the system Photos
+picker with previews of the library; up to 20 photos can be selected. The picker runs out of process,
+so no Photos permission is needed. The chosen originals are copied, EXIF intact, to
+`~/Library/Application Support/IQCoach/photos/<stamp>/` and analysed from there; the library is never
+modified. `IQCoach --analyze-photos N` (a launch flag for automation) still uses PhotoKit to take the N
+newest camera photos and does ask for read access.

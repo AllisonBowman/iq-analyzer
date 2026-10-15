@@ -32,7 +32,7 @@ struct AppCommands: Commands {
                 .keyboardShortcut("o", modifiers: .command)
             Button("Analyze Folder…") { model.isChoosingFolder = true }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
-            Button("Analyze \(AppModel.photosCount) Newest from Photos") { model.analyzeFromPhotos(count: AppModel.photosCount) }
+            Button("Choose Photos to Analyze…") { model.isPickingPhotos = true }
                 .keyboardShortcut("p", modifiers: [.command, .shift])
         }
         CommandGroup(replacing: .help) {

@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 import UniformTypeIdentifiers
 
 struct RootView: View {
@@ -33,8 +34,8 @@ struct RootView: View {
                     .help("Open a results.json (⌘O)")
                 Button { model.isChoosingFolder = true } label: { Label("Analyze Folder…", systemImage: "folder.badge.gearshape") }
                     .help("Run the analyzer on a folder of photos (⇧⌘O)")
-                Button { model.analyzeFromPhotos(count: AppModel.photosCount) } label: { Label("Analyze from Photos", systemImage: "photo.on.rectangle.angled") }
-                    .help("Copy the \(AppModel.photosCount) newest camera photos out of Photos and analyze them (⇧⌘P); the count is in Settings")
+                Button { model.isPickingPhotos = true } label: { Label("Choose Photos…", systemImage: "photo.on.rectangle.angled") }
+                    .help("Pick up to \(AppModel.maxPickedPhotos) photos from your Photos library to analyze (⇧⌘P)")
                 if let cam = model.selectedCamera {
                     ShareLink(item: MarkdownExport.coaching(for: cam, insights: CoachingEngine.insights(for: cam)),
                               subject: Text("Coaching for \(cam.model)")) {
@@ -50,6 +51,9 @@ struct RootView: View {
             case .failure(let e): model.errorMessage = e.localizedDescription
             }
         }
+        .photosPicker(isPresented: $model.isPickingPhotos, selection: $model.pickedPhotos,
+                      maxSelectionCount: AppModel.maxPickedPhotos, matching: .images, preferredItemEncoding: .current)
+        .onChange(of: model.pickedPhotos) { _, items in model.analyze(picked: items) }
         .fileImporter(isPresented: $model.isChoosingFolder, allowedContentTypes: [.folder]) { result in
             if case .success(let url) = result { model.analyze(folder: url) }
         }
@@ -122,7 +126,7 @@ struct EmptyStateView: View {
             Button("Open Results…") { model.isImporting = true }
                 .buttonStyle(.borderedProminent)
             Button("Analyze Folder…") { model.isChoosingFolder = true }
-            Button("Analyze \(AppModel.photosCount) Newest from Photos") { model.analyzeFromPhotos(count: AppModel.photosCount) }
+            Button("Choose Photos to Analyze…") { model.isPickingPhotos = true }
         }
         .padding(24)
     }

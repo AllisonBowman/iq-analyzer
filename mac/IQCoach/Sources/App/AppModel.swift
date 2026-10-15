@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 import Observation
 
 enum SidebarItem: Hashable, Sendable {
@@ -27,6 +28,9 @@ final class AppModel {
     var errorMessage: String?
     var isImporting = false
     var isChoosingFolder = false
+    var isPickingPhotos = false
+    var pickedPhotos: [PhotosPickerItem] = []
+    static let maxPickedPhotos = 20
     var progress: AnalysisProgress?
     private var analysisTask: Task<Void, Never>?
 
@@ -93,6 +97,33 @@ final class AppModel {
             do {
                 _ = try await runner.validate()
                 let folder = try await PhotosImporter.exportNewest(count: count) { line in
+                    Task { @MainActor in self.record(line: line) }
+                }
+                let json = try await runner.analyze(folder: folder, keepPaths: true) { line in
+                    Task { @MainActor in self.record(line: line) }
+                }
+                self.progress = nil
+                self.load(url: json)
+            } catch {
+                self.progress?.failure = error.localizedDescription
+                self.progress?.finished = true
+            }
+        }
+    }
+
+    /// Analyses the photos chosen in the system Photos picker (up to `maxPickedPhotos`).
+    func analyze(picked items: [PhotosPickerItem]) {
+        guard !items.isEmpty else { return }
+        let defaults = UserDefaults.standard
+        let runner = AnalyzerRunner(python: defaults.string(forKey: "pythonPath") ?? Self.defaultPython,
+                                    repo: defaults.string(forKey: "repoPath") ?? Self.defaultRepo)
+        progress = AnalysisProgress()
+        pickedPhotos = []
+        analysisTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                _ = try await runner.validate()
+                let folder = try await PhotosImporter.export(picked: items) { line in
                     Task { @MainActor in self.record(line: line) }
                 }
                 let json = try await runner.analyze(folder: folder, keepPaths: true) { line in
