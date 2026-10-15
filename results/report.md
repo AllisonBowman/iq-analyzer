@@ -1,6 +1,6 @@
 # Allison's Photos library, all 389 camera captures
 
-Generated 2026-10-15 01:14 by iqa on 389 images.
+Generated 2026-10-15 08:38 by iqa on 389 images.
 
 ## Summary
 
@@ -16,8 +16,8 @@ Generated 2026-10-15 01:14 by iqa on 389 images.
 | Luma noise at mid-grey (8-bit std) | 2.23 | 0.35 | 10.11 | 337 |
 | Chroma noise at mid-grey (8-bit std) | 0.54 | 0.00 | 2.09 | 337 |
 | Dynamic range @ SNR 4 (stops, output-referred) | 6.3 | 2.3 | 8.6 | 72 |
-| Highlight clipping (% pixels) | 0.73 | 0.00 | 15.60 | 389 |
-| Shadow clipping (% pixels) | 0.02 | 0.00 | 16.66 | 389 |
+| Highlight clipping (% pixels) | 0.42 | 0.00 | 14.70 | 389 |
+| Shadow clipping (% pixels) | 0.95 | 0.00 | 71.75 | 389 |
 | Noise whiteness (0.14 = white; higher = NR / compression) | 0.42 | 0.10 | 0.93 | 389 |
 | Colorfulness (Hasler-Suesstrunk) | 38.6 | 6.9 | 129.8 | 389 |
 
@@ -71,11 +71,11 @@ Generated 2026-10-15 01:14 by iqa on 389 images.
 
 | file | % clipped | camera | ISO |
 | --- | --- | --- | --- |
-| 6721B8DA-E5D3-4B54-B807-8DB95C9B4FCE.jpeg | 15.60 | iPhone 17 Pro Max | 125.0 |
-| 61B631F3-5D0C-4575-9B65-BD40EC2A965E.jpeg | 13.97 | NIKON D850 | 64.0 |
-| E07C5F37-BF62-4633-AD99-285D55F241EB.jpeg | 13.12 | iPhone 13 | 40.0 |
-| 5372EF8E-6ED0-456E-B497-3C72FE73ECFE.jpeg | 12.41 | iPhone 13 | 50.0 |
-| 3A5C53B6-FDA8-405C-AEDF-3A724FBEDC4B.jpeg | 12.29 | iPhone 17 Pro Max | 125.0 |
+| 6721B8DA-E5D3-4B54-B807-8DB95C9B4FCE.jpeg | 14.70 | iPhone 17 Pro Max | 125.0 |
+| 61B631F3-5D0C-4575-9B65-BD40EC2A965E.jpeg | 13.92 | NIKON D850 | 64.0 |
+| 3A5C53B6-FDA8-405C-AEDF-3A724FBEDC4B.jpeg | 11.33 | iPhone 17 Pro Max | 125.0 |
+| 9BD2881A-566B-4598-A89B-4C0F1C6B5A96.jpeg | 10.97 | NIKON D850 | 80.0 |
+| 70B6E13D-95FA-49AF-B627-92271E78D577.jpeg | 7.59 | iPhone 4S | 50.0 |
 
 ## By camera
 
@@ -131,5 +131,5 @@ Generated 2026-10-15 01:14 by iqa on 389 images.
 - **Overshoot** is how far the edge profile overshoots its bright plateau, in % of the step: a direct measure of sharpening halo. MTF50P (relative to the MTF peak) is the sharpening-robust companion of MTF50.
 - **SNR at mid-grey** is 20·log10(118 / noise std) on the 8-bit luminance of flat patches; 35+ dB is clean, below 25 dB is visibly noisy. 8-bit quantisation alone caps it at about 52 dB. The figure is output-referred: noise reduction and JPEG/HEIC compression lower it as much as the sensor does, so SNR-vs-ISO across formats is partly a chart of processing. `noise_whiteness` near 0.14 means white noise; 0.3+ means the noise has been smoothed by NR or compression. `noise_spectral_peak` is how far the strongest frequency in the averaged patch spectrum stands above its surroundings: about 1 for noise, above 8 (`noise_periodic_suspect`) the flat patches contain a repeating pattern (a screen's pixel grid, a weave, halftone) at `noise_periodic_freq_cpp` cycles per pixel, and the SNR is of the pattern, not the sensor.
 - **Dynamic range** is output-referred: the stops between near-white and the darkest level whose scene-linear SNR still exceeds the threshold. A JPEG's tone curve bounds it, and the floor can only be found in frames that contain near-black flat areas; 'lower bound' rows are excluded from the medians.
-- **Clipping** is the share of pixels at the top (any channel >= 254) or bottom (all channels <= 1) of the range.
+- **Clipping** is the share of pixels at the top (any channel >= 254) or bottom (all channels <= 1) of the range, measured in the file's own encoding before any profile conversion. `clip_gamut_pct` is the extra share that saturates only after converting Display P3 or Adobe RGB to sRGB: colour outside the sRGB gamut, not lost detail.
 - **White balance** is the gray-world ratio of linear channel means (and in stops); it describes the scene's cast as rendered, which for sunsets and underwater work is intent, not error.

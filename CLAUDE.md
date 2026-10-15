@@ -13,9 +13,9 @@ overnight on 2026-10-13 by Claude from a cloud session; Claude Code on this Mac 
 Keep that audience in mind: a camera-team engineer will read this code. Prefer correctness,
 clear method notes with the ISO reference, and validation against ground truth over features.
 
-## State of the project (as of 2026-10-15 01:30 ET)
+## State of the project (as of 2026-10-15 09:30 ET)
 
-Done and validated (101 tests pass: `python3 -m pytest -q`):
+Done and validated (102 tests pass: `python3 -m pytest -q`):
 - **A first adversarial review ran on this Mac** (`claude -p` with REVIEW_PROMPT.md, output in
   `REVIEW.md`, 12 min). It found 13 correctness issues and 13 methodology caveats. Fixed the same
   night, each pinned by a test in `tests/test_adversarial.py`: clipped plateaus now rejected
@@ -67,6 +67,9 @@ Not done yet:
 - **Structure analysis: done** (`iqa/structure.py`, fourth full run, FINDINGS §7): focus map and
   subject centroid, thirds distance (centre-to-thirds units), orientation shares, level-edge tilt,
   surface shares, in-focus/background MTF50 split (the review's two-cluster item).
+- **Clipping is measured before the profile conversion** (fifth full run, FINDINGS §8): the earlier
+  highlight-clipping counts on Display P3 files were inflated by gamut clipping; `clip_gamut_pct`
+  reports that share separately.
 - Not packaged (`pyproject.toml` is minimal); no CI.
 
 ## Environment on this Mac

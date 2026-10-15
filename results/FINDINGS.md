@@ -159,3 +159,22 @@ unchanged. On this library:
 - **Shallow depth of field.** Of the 52 frames with five or more measured edges, 34 split cleanly into
   a sharp and a soft group; for those the p80 figure is the subject and the median mixes in the
   background, as the report's how-to-read section now says.
+
+## 8. Clipping was over-counted on wide-gamut files (fifth run, 2026-10-15)
+
+Highlight and shadow clipping had been measured after the Display P3 -> sRGB conversion. A saturated
+P3 colour outside the sRGB gamut clips a channel to 255 in that conversion and was counted as a blown
+highlight. It is now measured in the file's own encoding before conversion (`native_clip_stats` in
+`iqa/imageio.py`), and the sRGB-only excess is reported as `clip_gamut_pct`. Every other column is
+unchanged. The effect on this library, which is 328 of 389 Display P3 files:
+
+- Frames with more than 1 % blown highlights: **165 -> 105**. iPhone 17 Pro Max 90 -> 54 of 206,
+  iPhone 13 39 -> 23 of 85, iPhone XR 13 -> 6 of 21; the Nikon D850's sRGB JPEGs 3 -> 3 of 36, as
+  they should be. The earlier statement that 44 % of the 17 Pro Max frames clip highlights is withdrawn:
+  it is 26 %.
+- 72 frames carry more than 1 % of gamut clipping (maximum 11.7 %): saturated colour the file holds and
+  sRGB cannot, not lost detail. The app's highlight overlay draws from the display pipeline and can
+  differ from these counts on such frames.
+
+The slip was found by the IQ Coach build, which compared the analyzer's figure for a screen photo with
+the pixels it was drawing. This is the kind of error the "say what you do not trust" rule exists for.
