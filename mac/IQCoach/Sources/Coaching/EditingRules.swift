@@ -6,7 +6,7 @@ enum EditingRules {
 
     static func advice(for p: PhotoRecord) -> [EditingAdvice] {
         let found = [blownHighlights(p), crushedShadows(p), noisy(p), soft(p), halo(p), colourLean(p),
-                     flatTones(p), exposure(p), moire(p)].compactMap { $0 }
+                     flatTones(p), exposure(p), moire(p), straighten(p), thirdsCrop(p), shallowDepth(p)].compactMap { $0 }
         if found.isEmpty {
             return [EditingAdvice(id: "clean:\(p.id)", metric: nil, finding: nothingToFixText,
                                   apple: "Nothing needed. Try Auto only if you want a quick look.",
@@ -147,5 +147,40 @@ enum EditingRules {
             lightroom: "Use the Moire brush in the Adjustment brush panel.",
             generic: "Re-shoot at a different distance or angle.",
             caution: "Moire comes from fine regular detail (screens, fabric, brick) beating against the sensor grid.")
+    }
+
+    static func straighten(_ p: PhotoRecord) -> EditingAdvice? {
+        guard let t = p.structureHorizonTiltDeg, abs(t) >= 1.0 else { return nil }
+        let a = Fmt.num(abs(t), 1) + "°"
+        let dir = t > 0 ? "counter-clockwise" : "clockwise"
+        return EditingAdvice(
+            id: "straighten:\(p.id)", metric: nil,
+            finding: "Straighten by \(a): a long level edge is tilted \(a) (\(t > 0 ? "right" : "left") end lower).",
+            apple: "Crop > Straighten dial: turn it \(dir) by \(a), or press Auto.",
+            lightroom: "Transform > Auto, or the Straighten tool in the Crop panel, or the Angle slider set to \(Fmt.num(-t, 1))°.",
+            generic: "Rotate by \(Fmt.num(-t, 1))° and crop in to remove the empty corners.",
+            caution: "Straightening crops the corners, so leave room round the edges. A tilted line may be intended, such as a slope.")
+    }
+
+    static func thirdsCrop(_ p: PhotoRecord) -> EditingAdvice? {
+        guard let d = p.structureThirdsDistance, d > 0.3, let f = p.structureFocusFraction, f < 0.4 else { return nil }
+        return EditingAdvice(
+            id: "thirds:\(p.id)", metric: nil,
+            finding: "The subject sits \(Fmt.num(d, 2)) frame-diagonals from the nearest rule-of-thirds point, with detail concentrated in \(Fmt.share(f)) of the frame.",
+            apple: "Crop, with the grid showing: drag the frame so the subject lands on a crossing of the grid lines.",
+            lightroom: "Crop overlay: press O to cycle to the Rule of Thirds grid, then position the subject on a crossing.",
+            generic: "Crop so the subject sits on a rule-of-thirds crossing.",
+            caution: "Composition is taste: a centred or off-balance subject can be exactly the point.")
+    }
+
+    static func shallowDepth(_ p: PhotoRecord) -> EditingAdvice? {
+        guard let sharp = p.mtf50InfocusCPP, let bg = p.mtf50BackgroundCPP, sharp > 0, bg < 0.5 * sharp else { return nil }
+        return EditingAdvice(
+            id: "shallow:\(p.id)", metric: nil,
+            finding: "Shallow depth of field: the sharp group measures \(Fmt.cpp(sharp)) and the background \(Fmt.cpp(bg)). Sharpen only the subject.",
+            apple: "Photos has no local tool: apply light sharpening only (Adjust > Sharpen, Intensity low).",
+            lightroom: "Masking > Subject, then Sharpening + on that mask.",
+            generic: "Mask the subject and sharpen only inside the mask.",
+            caution: "Global sharpening will bring out noise in the blurred areas.")
     }
 }

@@ -4,6 +4,7 @@ struct PhotoDetailView: View {
     let photo: PhotoRecord
     @State private var editor: Editor = .applePhotos
     @State private var image: CGImage?
+    @State private var content: ContentState = .idle
     @Environment(\.isSnapshot) private var isSnapshot
 
     private var advice: [EditingAdvice] { EditingRules.advice(for: photo) }
@@ -17,6 +18,12 @@ struct PhotoDetailView: View {
                     Text([photo.camera, photo.lens].compactMap { $0 }.joined(separator: " · ")).font(.callout).foregroundStyle(.secondary)
                     Text(settingsLine).font(.callout).monospacedDigit().foregroundStyle(.secondary)
                 }
+            }
+            block("What is in the picture") {
+                ContentSectionBody(state: content)
+            }
+            block("Structure") {
+                StructureSectionBody(photo: photo, salientBox: content.summary?.salientBox)
             }
             block("Sharpness") {
                 row(.sharpnessLWPH); row(.sharpnessCPP); row(.overshoot)
@@ -45,6 +52,14 @@ struct PhotoDetailView: View {
         .task(id: photo.id) {
             image = nil
             if !isSnapshot { image = await ThumbnailLoader.load(path: photo.path) }
+        }
+        .task(id: photo.id) {
+            content = .idle
+            guard !isSnapshot else { return }
+            guard let path = photo.path, !path.isEmpty else { content = .noFile; return }
+            content = .loading
+            let result = await ContentIdentifier.shared.summary(path: path)
+            if !Task.isCancelled { content = .done(result) }
         }
     }
 
@@ -123,7 +138,9 @@ struct PhotoDetailView: View {
     }
 
     private func title(for a: EditingAdvice) -> String {
-        a.metric?.displayName ?? (a.id.hasPrefix("dark") ? "Exposure: dark" : a.id.hasPrefix("bright") ? "Exposure: bright" : "Moire")
+        a.metric?.displayName ?? (a.id.hasPrefix("dark") ? "Exposure: dark" : a.id.hasPrefix("bright") ? "Exposure: bright"
+            : a.id.hasPrefix("straighten") ? "Horizon" : a.id.hasPrefix("thirds") ? "Composition"
+            : a.id.hasPrefix("shallow") ? "Shallow depth of field" : "Moire")
     }
 
     @ViewBuilder private func adviceCard(_ a: EditingAdvice) -> some View {

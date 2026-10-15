@@ -43,6 +43,22 @@ struct PhotoRecord: Codable, Identifiable, Sendable, Hashable {
     var wbBOverGStops: Double? = nil
     var colorfulness: Double? = nil
     var datetime: String? = nil
+    // Structure analysis (iqa 0.2 and later); all nil in older results files.
+    var structureFocusFraction: Double? = nil
+    var structureFocusCX: Double? = nil
+    var structureFocusCY: Double? = nil
+    var structureThirdsDistance: Double? = nil
+    var structureOrientHorizontal: Double? = nil
+    var structureOrientVertical: Double? = nil
+    var structureOrientDiagonal: Double? = nil
+    var structureHorizonTiltDeg: Double? = nil
+    var structureFlatShare: Double? = nil
+    var structureTextureShare: Double? = nil
+    var structureEdgeShare: Double? = nil
+    var structureFocusMap: [[Double]]? = nil
+    var mtf50InfocusCPP: Double? = nil
+    var mtf50BackgroundCPP: Double? = nil
+    var infocusEdgeShare: Double? = nil
 
     enum CodingKeys: String, CodingKey {
         case file, path, lens, iso, width, height, format, datetime, colorfulness
@@ -77,6 +93,21 @@ struct PhotoRecord: Codable, Identifiable, Sendable, Hashable {
         case tonalRangeStops = "tonal_range_stops"
         case wbROverGStops = "wb_r_over_g_stops"
         case wbBOverGStops = "wb_b_over_g_stops"
+        case structureFocusFraction = "structure_focus_fraction"
+        case structureFocusCX = "structure_focus_cx"
+        case structureFocusCY = "structure_focus_cy"
+        case structureThirdsDistance = "structure_thirds_distance"
+        case structureOrientHorizontal = "structure_orient_horizontal"
+        case structureOrientVertical = "structure_orient_vertical"
+        case structureOrientDiagonal = "structure_orient_diagonal"
+        case structureHorizonTiltDeg = "structure_horizon_tilt_deg"
+        case structureFlatShare = "structure_flat_share"
+        case structureTextureShare = "structure_texture_share"
+        case structureEdgeShare = "structure_edge_share"
+        case structureFocusMap = "structure_focus_map"
+        case mtf50InfocusCPP = "mtf50_infocus_cpp"
+        case mtf50BackgroundCPP = "mtf50_background_cpp"
+        case infocusEdgeShare = "infocus_edge_share"
     }
 
     var id: String { path ?? file }
@@ -114,6 +145,24 @@ extension PhotoRecord {
             lumaP50: num(.lumaP50), tonalRangeStops: num(.tonalRangeStops),
             wbROverGStops: num(.wbROverGStops), wbBOverGStops: num(.wbBOverGStops),
             colorfulness: num(.colorfulness), datetime: str(.datetime))
+        structureFocusFraction = num(.structureFocusFraction)
+        structureFocusCX = num(.structureFocusCX)
+        structureFocusCY = num(.structureFocusCY)
+        structureThirdsDistance = num(.structureThirdsDistance)
+        structureOrientHorizontal = num(.structureOrientHorizontal)
+        structureOrientVertical = num(.structureOrientVertical)
+        structureOrientDiagonal = num(.structureOrientDiagonal)
+        structureHorizonTiltDeg = num(.structureHorizonTiltDeg)
+        structureFlatShare = num(.structureFlatShare)
+        structureTextureShare = num(.structureTextureShare)
+        structureEdgeShare = num(.structureEdgeShare)
+        if let m = (try? c.decodeIfPresent([[Double]].self, forKey: .structureFocusMap)) ?? nil,
+           !m.isEmpty, m.allSatisfy({ !$0.isEmpty }) {
+            structureFocusMap = m.map { $0.map { $0.isFinite ? min(max($0, 0), 1) : 0 } }
+        }
+        mtf50InfocusCPP = num(.mtf50InfocusCPP)
+        mtf50BackgroundCPP = num(.mtf50BackgroundCPP)
+        infocusEdgeShare = num(.infocusEdgeShare)
     }
 }
 
@@ -146,6 +195,12 @@ extension PhotoRecord {
         guard wbROverGStops != nil || wbBOverGStops != nil else { return nil }
         return max(abs(wbROverGStops ?? 0), abs(wbBOverGStops ?? 0))
     }
+
+    /// True when this row carries any structure-analysis field.
+    var hasStructure: Bool { structureFocusFraction != nil || structureFocusMap != nil || structureHorizonTiltDeg != nil }
+
+    /// True when the measured edges split cleanly into a sharp group and a soft background group.
+    var hasFocusSplit: Bool { mtf50InfocusCPP != nil && mtf50BackgroundCPP != nil }
 
     var isFront: Bool { (lens ?? "").lowercased().contains("front") }
 

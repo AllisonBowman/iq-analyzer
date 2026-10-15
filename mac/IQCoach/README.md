@@ -39,9 +39,9 @@ Writes `library.png`, `camera-<first camera>.png`, `photo-<first photo>.png`, `g
 ## Layout
 
 - `Sources/Model`: PhotoRecord (NaN-tolerant decoding), Metric and bands, camera/lens grouping and summaries.
-- `Sources/Coaching`: the ten camera rules and nine photo editing rules, pure functions.
+- `Sources/Coaching`: the twelve camera rules and twelve photo editing rules, pure functions.
 - `Sources/Views`, `Sources/App`, `Sources/Support`: UI, app entry and snapshot runner, analyzer process and formatting.
-- `Tests/IQCoachTests`: 42 Swift Testing tests (every rule fires and stays quiet, band boundaries, decoding).
+- `Tests/IQCoachTests`: Swift Testing tests (every rule fires and stays quiet, band boundaries, decoding).
 
 ## Live-window captures
 

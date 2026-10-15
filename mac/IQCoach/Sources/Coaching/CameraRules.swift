@@ -283,4 +283,35 @@ enum CameraRules {
             actions: ["Compare cameras and lenses by their medians, not by single photos.", "Treat a gap between two photos of under 30 % as a tie."],
             evidence: [EvidenceItem(metric: "Median relative CI width", value: Fmt.share(med), n: w.count)])
     }
+
+    // MARK: Horizon lean
+    static func horizonLean(_ cam: CameraGroup) -> Insight? {
+        let tilts = cam.photos.compactMap(\.structureHorizonTiltDeg)
+        guard tilts.count >= minPhotos, let med = Stats.median(tilts), abs(med) >= 0.7 else { return nil }
+        let side = med > 0 ? "right" : "left"
+        let x = Fmt.num(abs(med), 1)
+        return Insight(
+            id: "horizon-lean:\(cam.model)", scope: .camera(cam.model), severity: .notice,
+            title: "Your horizons lean \(side) by \(x)°",
+            finding: "Across \(Fmt.count(tilts.count, "photo")) with a level edge, the median horizon is tilted \(x)°, with the \(side) end lower.",
+            why: "A consistent lean points to a habit in how the camera is held or mounted, not to chance, and every photo then needs straightening and cropping.",
+            actions: ["Turn on the level or grid in the camera app and line the horizon up before you shoot.",
+                      "If you use a tripod, check the head is level with the bubble or the built-in level.",
+                      "Straighten in editing for photos you already have; the per-photo advice gives the angle."],
+            evidence: [EvidenceItem(metric: "Median horizon tilt (positive = right end lower)", value: Fmt.num(med, 1) + "°", n: tilts.count)])
+    }
+
+    // MARK: Shallow depth of field habit
+    static func shallowDepthHabit(_ cam: CameraGroup) -> Insight? {
+        let n = cam.photos.count
+        let k = cam.photos.filter(\.hasFocusSplit).count
+        guard n >= minPhotos, Double(k) / Double(n) >= 0.30 else { return nil }
+        return Insight(
+            id: "shallow-dof:\(cam.model)", scope: .camera(cam.model), severity: .info,
+            title: "You shoot a lot of shallow depth of field",
+            finding: "\(Fmt.share(Double(k) / Double(n))) of your photos (\(k) of \(n)) split into a sharp subject and a soft background.",
+            why: "On those frames the median edge sharpness includes the blurred background, so it reads low. The p80 figure is the subject; the median includes the background.",
+            actions: ["Read the p80 (in-focus) sharpness as the lens figure for this camera.", "When you sharpen in editing, mask the subject instead of sharpening the whole frame."],
+            evidence: [EvidenceItem(metric: "Photos with a clean sharp / soft split", value: Fmt.share(Double(k) / Double(n)), n: n)])
+    }
 }

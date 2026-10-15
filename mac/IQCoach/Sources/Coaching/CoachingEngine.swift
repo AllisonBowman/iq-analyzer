@@ -14,6 +14,8 @@ enum CoachingEngine {
             CameraRules.sharpeningCharacter(cam),
             CameraRules.colourLean(cam),
             CameraRules.slowShutter(cam),
+            CameraRules.horizonLean(cam),
+            CameraRules.shallowDepthHabit(cam),
         ]
         out += CameraRules.apertureSweetSpot(cam)
         out.append(CameraRules.sharpnessConfidence(cam))

@@ -12,6 +12,7 @@ struct CameraReportView: View {
             VStack(alignment: .leading, spacing: 32) {
                 header
                 reportCard
+                CameraContentRow(camera: camera)
                 charts
                 coaching
                 photosSection
