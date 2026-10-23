@@ -15,21 +15,32 @@ targets:
     platform: macOS
     sources:
       - path: Sources
+    entitlements:
+      path: Sources/IQCoach.entitlements
+      properties:
+        com.apple.security.personal-information.photos-library: true
     settings:
       base:
+        DEVELOPMENT_TEAM: FK6E9XBY6Y
         PRODUCT_BUNDLE_IDENTIFIER: com.allisonbowman.iqcoach
         PRODUCT_NAME: IQCoach
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: IQ Coach
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.photography
-        INFOPLIST_KEY_NSHumanReadableCopyright: "MIT licence"
+        INFOPLIST_KEY_NSHumanReadableCopyright: "Copyright © 2026 Allison Bowman. MIT License."
         INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "IQ Coach copies your newest camera photos into its own folder so the analyzer can measure them. Your library is only read, never changed."
         ENABLE_APP_SANDBOX: NO
         ENABLE_HARDENED_RUNTIME: NO
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGN_STYLE: Manual
         CURRENT_PROJECT_VERSION: 1
-        MARKETING_VERSION: "0.1"
+        MARKETING_VERSION: "1.0"
+      configs:
+        Release:
+          CODE_SIGN_IDENTITY: "Developer ID Application"
+          ENABLE_HARDENED_RUNTIME: YES
+          OTHER_CODE_SIGN_FLAGS: "--timestamp"
+          CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
   IQCoachTests:
     type: bundle.unit-test
     platform: macOS
