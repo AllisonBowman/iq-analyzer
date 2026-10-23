@@ -3,7 +3,8 @@ import SwiftUI
 extension PhotoRecord {
     var sortDate: Date { date ?? .distantPast }
     var sortISO: Double { iso ?? 0 }
-    var sortSharpness: Double { mtf50P80LWPH ?? -1 }
+    /// Photos with too few edges sort as missing.
+    var sortSharpness: Double { gatedSharpnessLWPH ?? -1 }
     var sortSNR: Double { snrMidgreyDB ?? -1 }
     var sortClip: Double { max(clipHighPct ?? 0, clipLowPct ?? 0) }
 
@@ -48,11 +49,6 @@ struct PhotoTable: View {
 
     private var sorted: [PhotoRecord] { photos.sorted(using: sortOrder) }
 
-    private static func band(_ metric: Metric, _ v: Double?) -> String {
-        guard let v else { return "Not measured" }
-        return metric.format(v) + (metric.band(for: v).map { " · \($0.word)" } ?? "")
-    }
-
     var body: some View {
         if isSnapshot {
             SnapshotGrid(columns: [
@@ -60,8 +56,8 @@ struct PhotoTable: View {
                 ("Date", { $0.date.map(Fmt.date) ?? "No date" }),
                 ("Lens", { $0.lensName }),
                 ("ISO", { $0.iso.map(Fmt.int) ?? "—" }),
-                ("Sharpness", { Self.band(.sharpnessLWPH, $0.mtf50P80LWPH) }),
-                ("SNR", { Self.band(.snr, $0.snrMidgreyDB) }),
+                ("Sharpness", { PhotoReading.sharpnessText($0) }),
+                ("SNR", { PhotoReading.snrText($0) }),
                 ("Clipping", { $0.clippingSummary }),
             ], rows: sorted, thumb: { $0.path })
         } else {
@@ -78,10 +74,12 @@ struct PhotoTable: View {
                     .width(min: 120, ideal: 200)
                 TableColumn("ISO", value: \.sortISO) { p in Text(p.iso.map(Fmt.int) ?? "—").monospacedDigit() }
                     .width(min: 50, ideal: 60)
-                TableColumn("Sharpness", value: \.sortSharpness) { p in Text(Self.band(.sharpnessLWPH, p.mtf50P80LWPH)).monospacedDigit() }
-                    .width(min: 130, ideal: 170)
-                TableColumn("SNR", value: \.sortSNR) { p in Text(Self.band(.snr, p.snrMidgreyDB)).monospacedDigit() }
-                    .width(min: 110, ideal: 140)
+                TableColumn("Sharpness", value: \.sortSharpness) { p in
+                    Text(PhotoReading.sharpnessText(p)).monospacedDigit().foregroundStyle(p.hasSharpnessFigure ? .primary : .secondary)
+                }
+                    .width(min: 150, ideal: 200)
+                TableColumn("SNR", value: \.sortSNR) { p in Text(PhotoReading.snrText(p)).monospacedDigit() }
+                    .width(min: 110, ideal: 150)
                 TableColumn("Clipping", value: \.sortClip) { p in Text(p.clippingSummary).monospacedDigit() }
                     .width(min: 150, ideal: 190)
             }

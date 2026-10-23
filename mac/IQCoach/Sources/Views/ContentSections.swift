@@ -149,7 +149,7 @@ struct FocusMapView: View {
     }
 }
 
-/// "Structure": focus map with caption, then orientation, horizon, surface and focus-split rows.
+/// "Structure": focus map with caption, then orientation, level-edge tilt, surface and focus-split rows.
 struct StructureSectionBody: View {
     let photo: PhotoRecord
     let salientBox: CGRect?
@@ -203,9 +203,9 @@ struct StructureSectionBody: View {
             HStack(spacing: 8) {
                 Text(Structure.horizonText(photo)).monospacedDigit()
                 if let t = photo.structureHorizonTiltDeg { BandCapsule(band: Structure.horizonBand(t)) }
-                TextInfoButton(title: "Horizon tilt", text: Structure.horizonDefinition)
+                TextInfoButton(title: "Level-edge tilt", text: Structure.horizonDefinition)
             }
-        } label: { Text("Horizon tilt") }
+        } label: { Text("Level-edge tilt") }
         .accessibilityElement(children: .combine)
     }
 

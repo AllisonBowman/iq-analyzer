@@ -60,21 +60,21 @@ struct LibraryOverviewView: View {
             SnapshotGrid(columns: [
                 ("Camera", { $0.model }),
                 ("Photos", { String($0.photos.count) }),
-                ("Sharpness", { Self.cell(.sharpnessLWPH, $0.summary.sharpnessLWPH) }),
-                ("Noise", { Self.cell(.snr, $0.summary.snr) }),
+                ("Sharpness", { $0.summary.sharpnessCell }),
+                ("Noise", { $0.summary.noiseCell }),
                 ("Highlights", { Self.cell(.highlightClip, $0.summary.clipHighMedian) }),
-                ("Halo", { Self.cell(.overshoot, $0.summary.overshoot) }),
-                ("Colour lean", { Self.cell(.whiteBalance, $0.summary.wbLean) }),
+                ("Halo", { $0.summary.haloCell }),
+                ("Colour lean", { $0.summary.leanCell }),
             ], rows: library.cameras, limit: 19)
         } else {
             Table(library.cameras) {
                 TableColumn("Camera") { c in Text(c.model).lineLimit(1) }.width(min: 140, ideal: 190)
                 TableColumn("Photos") { c in Text(c.photos.count.formatted()).monospacedDigit() }.width(60)
-                TableColumn("Sharpness") { c in Text(Self.cell(.sharpnessLWPH, c.summary.sharpnessLWPH)).monospacedDigit() }.width(min: 140, ideal: 180)
-                TableColumn("Noise") { c in Text(Self.cell(.snr, c.summary.snr)).monospacedDigit() }.width(min: 110, ideal: 140)
+                TableColumn("Sharpness") { c in Text(c.summary.sharpnessCell).monospacedDigit() }.width(min: 140, ideal: 180)
+                TableColumn("Noise") { c in Text(c.summary.noiseCell).monospacedDigit() }.width(min: 110, ideal: 140)
                 TableColumn("Highlights") { c in Text(Self.cell(.highlightClip, c.summary.clipHighMedian)).monospacedDigit() }.width(min: 110, ideal: 140)
-                TableColumn("Halo") { c in Text(Self.cell(.overshoot, c.summary.overshoot)).monospacedDigit() }.width(min: 100, ideal: 130)
-                TableColumn("Colour lean") { c in Text(Self.cell(.whiteBalance, c.summary.wbLean)).monospacedDigit() }.width(min: 130, ideal: 170)
+                TableColumn("Halo") { c in Text(c.summary.haloCell).monospacedDigit() }.width(min: 100, ideal: 130)
+                TableColumn("Colour lean") { c in Text(c.summary.leanCell).monospacedDigit() }.width(min: 130, ideal: 170)
             }
             .frame(height: CGFloat(min(library.cameras.count, 10)) * 28 + 40)
             .accessibilityLabel("Cameras table")

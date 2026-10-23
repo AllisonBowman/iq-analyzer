@@ -22,13 +22,14 @@ struct ContentSummary: Sendable, Hashable {
     static func unavailable(_ reason: String) -> ContentSummary { ContentSummary(available: false, reason: reason) }
     var hasText: Bool { textObservationCount > 0 }
 
-    /// "2 faces · text present · horizon 1.4° off level"; nil when nothing applies.
+    /// "2 faces · text present · Vision horizon 1.4° off level"; nil when nothing applies. The horizon is Vision's
+    /// own, which can find a different line from the analyzer's level-edge tilt, so it is labelled as Vision's.
     var summaryLine: String? {
         let s = self
         var parts: [String] = []
         if s.faceCount > 0 { parts.append(Fmt.count(s.faceCount, "face")) }
         if s.hasText { parts.append("text present") }
-        if let h = s.horizonDegrees { parts.append("horizon \(Fmt.num(abs(h), 1))° off level") }
+        if let h = s.horizonDegrees { parts.append("Vision horizon \(Fmt.num(abs(h), 1))° off level") }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }

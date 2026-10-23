@@ -3,6 +3,11 @@ import Foundation
 /// Per-photo editing advice. Every rule is a pure function of one photo.
 enum EditingRules {
     static let nothingToFixText = "This photo is clean, sharp and well exposed; edit for taste."
+    /// Noise advice fires below this SNR. It sits inside the Fair band (25 to 32 dB): grain starts to show
+    /// under the 32 dB clean mark, and under 30 dB noise reduction is worth the texture it costs.
+    static let noiseAdviceDB = 30.0
+    /// Sharpness advice fires below this p80 figure (c/px).
+    static let softCPP = 0.18
 
     static func advice(for p: PhotoRecord) -> [EditingAdvice] {
         let found = [blownHighlights(p), crushedShadows(p), noisy(p), soft(p), halo(p), colourLean(p),
@@ -24,7 +29,7 @@ enum EditingRules {
         guard let c = p.clipHighPct, c > 0.5 else { return nil }
         return EditingAdvice(
             id: "highlights:\(p.id)", metric: .highlightClip,
-            finding: "\(Fmt.pct(c, 1)) of the picture is blown to pure white.",
+            finding: "\(Fmt.pct(c, 1)) of the picture is blown: at the top of the range in at least one colour channel.",
             apple: "Adjust > Light: drag Highlights down, then add Brilliance to open the bright areas.",
             lightroom: "Highlights -40 to -80, then Whites down a little.",
             generic: "Lower highlights, then whites.",
@@ -43,11 +48,12 @@ enum EditingRules {
     }
 
     static func noisy(_ p: PhotoRecord) -> EditingAdvice? {
-        guard let s = p.snrMidgreyDB, s < 30, p.noisePeriodicSuspect != true else { return nil }
-        let smoothed = (p.noiseWhiteness ?? 0) >= 0.4
+        // Only a clean reading counts: extrapolated, texture-suspect and periodic rows are not sensor noise.
+        guard p.snrIsClean, let s = p.snrMidgreyDB, s < noiseAdviceDB else { return nil }
+        let smoothed = (p.noiseWhiteness ?? 0) >= Metric.whitenessHeavy
         return EditingAdvice(
             id: "noise:\(p.id)", metric: .snr,
-            finding: "Noise is visible: signal to noise is \(Fmt.db(s)), under the 30 dB mark.",
+            finding: "Noise is visible: signal to noise is \(Fmt.db(s)). Grain starts to show under the \(Fmt.db(Metric.snrCleanDB)) clean mark; under \(Fmt.db(noiseAdviceDB)) noise reduction is worth applying.",
             apple: "Adjust > Noise Reduction: start moderate (about 30-50).",
             lightroom: "Denoise (AI) 30-50, or Luminance noise reduction 20-40 with Detail 50.",
             generic: "Apply luminance noise reduction before any sharpening.",
@@ -55,9 +61,12 @@ enum EditingRules {
     }
 
     static func soft(_ p: PhotoRecord) -> EditingAdvice? {
-        guard let c = p.mtf50P80CPP, c < 0.18 else { return nil }
+        // A sharpness figure needs three valid edges. On a shallow-depth-of-field frame whose sharp group is not
+        // soft, a low p80 is the background, not the subject.
+        guard p.hasSharpnessFigure, let c = p.mtf50P80CPP, c < softCPP else { return nil }
+        if p.hasFocusSplit, (p.mtf50InfocusCPP ?? 0) >= softCPP { return nil }
         let o = p.overshootMedianPct ?? 0
-        if o >= 8 {
+        if o >= Metric.overshootHardPct {
             return EditingAdvice(
                 id: "soft:\(p.id)", metric: .sharpnessCPP,
                 finding: "Sharpness is low (\(Fmt.cpp(c))) but edges already overshoot by \(Fmt.pct(o, 1)).",
@@ -68,7 +77,7 @@ enum EditingRules {
         }
         return EditingAdvice(
             id: "soft:\(p.id)", metric: .sharpnessCPP,
-            finding: "Sharpness is low (\(Fmt.cpp(c)), under 0.18) and the edges show little sharpening (\(Fmt.pct(o, 1)) overshoot).",
+            finding: "Sharpness is low (\(Fmt.cpp(c)), under \(Fmt.num(softCPP, 2))) and the edges show little sharpening (\(Fmt.pct(o, 1)) overshoot).",
             apple: "Adjust > Sharpen: Sharpness 20-40, and Definition about 10.",
             lightroom: "Detail > Sharpening 40-60, Radius 1.0, Masking 40-70.",
             generic: "Sharpen on luminance only, and mask flat areas such as sky.",
@@ -76,10 +85,10 @@ enum EditingRules {
     }
 
     static func halo(_ p: PhotoRecord) -> EditingAdvice? {
-        guard let o = p.overshootMedianPct, o >= 12 else { return nil }
+        guard p.hasSharpnessFigure, let o = p.overshootMedianPct, o >= Metric.overshootHaloPct else { return nil }
         return EditingAdvice(
             id: "halo:\(p.id)", metric: .overshoot,
-            finding: "Edges overshoot by \(Fmt.pct(o, 1)): a visible sharpening halo.",
+            finding: "Edges overshoot by \(Fmt.pct(o, 1)): a visible sharpening halo (\(Fmt.int(Metric.overshootHaloPct)) % and up).",
             apple: "Adjust > Sharpen: set Sharpness to 0.",
             lightroom: "Reduce Sharpening to 0-20 and set Clarity to 0.",
             generic: "Avoid any further sharpening.",
@@ -109,7 +118,7 @@ enum EditingRules {
         return EditingAdvice(
             id: "flat:\(p.id)", metric: .tonalRange,
             finding: "Tones are flat: only \(Fmt.stops(t, 1)) between darkest and brightest, with room to spare at both ends.",
-            apple: "Adjust > Light: Contrast up, and lower Black Point.",
+            apple: "Adjust > Light: Contrast up, and raise Black Point to deepen the blacks.",
             lightroom: "Contrast +15 to +30, or add a gentle tone curve.",
             generic: "Apply an S-curve.",
             caution: nil)
@@ -142,7 +151,7 @@ enum EditingRules {
         guard p.noisePeriodicSuspect == true else { return nil }
         return EditingAdvice(
             id: "moire:\(p.id)", metric: nil,
-            finding: "A repeating pattern is present in flat areas (moire), so the noise figure reflects the pattern rather than the sensor.",
+            finding: "A repeating pattern (moire, a screen or a fabric weave) was found in the flat areas. Where it covered a minority of them it was removed before measuring; otherwise the noise figure describes the pattern. Either way this photo is left out of the camera's noise figures.",
             apple: "Photos has no moire control; crop or re-shoot.",
             lightroom: "Use the Moire brush in the Adjustment brush panel.",
             generic: "Re-shoot at a different distance or angle.",
@@ -166,7 +175,7 @@ enum EditingRules {
         guard let d = p.structureThirdsDistance, d > 0.75, let f = p.structureFocusFraction, f < 0.4 else { return nil }
         return EditingAdvice(
             id: "thirds:\(p.id)", metric: nil,
-            finding: "The subject sits \(Fmt.num(d, 2)) frame-diagonals from the nearest rule-of-thirds point, with detail concentrated in \(Fmt.share(f)) of the frame.",
+            finding: "The subject sits \(Fmt.num(d, 2)) from the nearest rule-of-thirds point (0 is on the point, 1 is the frame centre), with detail concentrated in \(Fmt.share(f)) of the frame.",
             apple: "Crop, with the grid showing: drag the frame so the subject lands on a crossing of the grid lines.",
             lightroom: "Crop overlay: press O to cycle to the Rule of Thirds grid, then position the subject on a crossing.",
             generic: "Crop so the subject sits on a rule-of-thirds crossing.",

@@ -4,11 +4,12 @@ import Foundation
 
 struct ModelTests {
     @Test func sharpnessBandBoundaries() {
-        #expect(Metric.sharpnessLWPH.band(for: 1499.9) == .poor)
-        #expect(Metric.sharpnessLWPH.band(for: 1500) == .fair)
-        #expect(Metric.sharpnessLWPH.band(for: 2500) == .good)
-        #expect(Metric.sharpnessLWPH.band(for: 3500) == .excellent)
+        // One scale only (APP-04): LW/PH is capped by the picture height, so it carries no band of its own.
+        #expect(Metric.sharpnessLWPH.band(for: 1000) == nil)
+        #expect(Metric.sharpnessLWPH.band(for: 5000) == nil)
+        #expect(Metric.sharpnessCPP.band(for: 0.1199) == .poor)
         #expect(Metric.sharpnessCPP.band(for: 0.12) == .fair)
+        #expect(Metric.sharpnessCPP.band(for: 0.20) == .good)
         #expect(Metric.sharpnessCPP.band(for: 0.30) == .excellent)
     }
     @Test func snrBandBoundaries() {
@@ -27,7 +28,8 @@ struct ModelTests {
         #expect(Metric.overshoot.band(for: 2.99) == .excellent)
         #expect(Metric.overshoot.band(for: 3) == .good)
         #expect(Metric.overshoot.band(for: 8) == .fair)
-        #expect(Metric.overshoot.band(for: 15) == .poor)
+        #expect(Metric.overshoot.band(for: 11.99) == .fair)
+        #expect(Metric.overshoot.band(for: 12) == .poor)
         #expect(Metric.whiteBalance.band(for: 0.1) == .good)
         #expect(Metric.whiteBalance.band(for: 0.2) == .fair)
         #expect(Metric.whiteBalance.band(for: 0.4) == .poor)

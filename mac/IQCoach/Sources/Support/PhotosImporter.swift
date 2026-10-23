@@ -1,4 +1,5 @@
 import Foundation
+import ImageIO
 import Photos
 import PhotosUI
 import SwiftUI
@@ -13,7 +14,7 @@ enum PhotosImportError: LocalizedError {
         case .denied(let s):
             "IQ Coach was not allowed to read your Photos library (status \(s.rawValue)). Allow it in System Settings > Privacy & Security > Photos, then try again."
         case .nothingToExport:
-            "No camera photos were found in the library."
+            "No camera captures were found in the library (a capture names a camera model in its EXIF and has at least 5 MP)."
         }
     }
 }
@@ -36,33 +37,60 @@ struct PhotosImporter: Sendable {
         guard status == .authorized || status == .limited else { throw PhotosImportError.denied(status) }
     }
 
-    /// Copies the `count` newest camera photos (screenshots skipped) and returns the folder.
+    /// Smallest picture counted as a camera capture, as in iqa/select_captures.py (which built the library run).
+    static let minCapturePixels = 5_000_000
+
+    /// A camera capture, as iqa/select_captures.py defines it: the file names a camera model in its EXIF and has at
+    /// least 5 MP. Screenshots, saved images and thumbnails fail one or both.
+    static func isCapture(cameraModel: String?, width: Int, height: Int) -> Bool {
+        guard let m = cameraModel?.trimmingCharacters(in: .whitespaces), !m.isEmpty else { return false }
+        return width * height >= minCapturePixels
+    }
+
+    /// The camera model and pixel size recorded in an image file, read with ImageIO.
+    static func captureInfo(of url: URL) -> (model: String?, width: Int, height: Int)? {
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any] else { return nil }
+        let tiff = props[kCGImagePropertyTIFFDictionary] as? [CFString: Any]
+        let model = tiff?[kCGImagePropertyTIFFModel] as? String
+        let w = props[kCGImagePropertyPixelWidth] as? Int ?? 0
+        let h = props[kCGImagePropertyPixelHeight] as? Int ?? 0
+        return (model, w, h)
+    }
+
+    /// Copies the `count` newest camera captures and returns the folder. Screenshots are skipped, and so is any
+    /// file without an EXIF camera model or under 5 MP (saved images, thumbnails), matching iqa/select_captures.py;
+    /// scanning continues until `count` captures are copied or the library runs out.
     static func exportNewest(count: Int, onLine: @escaping @Sendable (String) -> Void) async throws -> URL {
         try await authorize()
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
         let fetch = PHAsset.fetchAssets(with: options)
-        var assets: [PHAsset] = []
-        fetch.enumerateObjects { asset, _, stop in
-            if !asset.mediaSubtypes.contains(.photoScreenshot) { assets.append(asset) }
-            if assets.count >= count { stop.pointee = true }
-        }
-        guard !assets.isEmpty else { throw PhotosImportError.nothingToExport }
         let dir = exportDirectory()
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let manager = PHAssetResourceManager.default()
         let opts = PHAssetResourceRequestOptions()
         opts.isNetworkAccessAllowed = true          // iCloud-only originals are downloaded
         var written = 0
-        for (i, asset) in assets.enumerated() {
+        var index = 0
+        while written < count && index < fetch.count {
+            let asset = fetch.object(at: index)
+            index += 1
+            if asset.mediaSubtypes.contains(.photoScreenshot) || asset.pixelWidth * asset.pixelHeight < minCapturePixels { continue }
             let resources = PHAssetResource.assetResources(for: asset)
             guard let original = resources.first(where: { $0.type == .photo }) ?? resources.first else { continue }
             let name = original.originalFilename.isEmpty ? "\(asset.localIdentifier.prefix(36)).jpg" : original.originalFilename
-            let target = dir.appendingPathComponent("\(String(format: "%03d", i + 1))-\(name)")
-            onLine("[\(i + 1)/\(assets.count)] exporting \(name)")
+            let target = dir.appendingPathComponent("\(String(format: "%03d", written + 1))-\(name)")
+            onLine("[\(written + 1)/\(count)] exporting \(name)")
             do {
                 try await writeResource(original, to: target, manager: manager, options: opts)
+                let info = captureInfo(of: target)
+                guard isCapture(cameraModel: info?.model, width: info?.width ?? 0, height: info?.height ?? 0) else {
+                    try? FileManager.default.removeItem(at: target)   // our own copy, never the library
+                    onLine("  skipped \(name): not a camera capture (no EXIF camera model, or under 5 MP)")
+                    continue
+                }
                 written += 1
             } catch {
                 onLine("  skipped \(name): \(error.localizedDescription)")

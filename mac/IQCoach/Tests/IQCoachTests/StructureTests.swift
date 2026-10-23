@@ -36,17 +36,17 @@ struct StructureTests {
     }
 
     // Camera rules
-    @Test func horizonLeanFires() {
+    @Test func levelEdgeLeanFires() {
         let cam = Fx.camera(8) { _, p in p.structureHorizonTiltDeg = 1.0 }
-        let r = CameraRules.horizonLean(cam)
-        #expect(r?.title == "Your horizons lean right by 1.0°")
-        let left = CameraRules.horizonLean(Fx.camera(8) { _, p in p.structureHorizonTiltDeg = -0.8 })
+        let r = CameraRules.levelEdgeLean(cam)
+        #expect(r?.title == "Your level edges lean right by 1.0°")
+        let left = CameraRules.levelEdgeLean(Fx.camera(8) { _, p in p.structureHorizonTiltDeg = -0.8 })
         #expect(left?.title.contains("left") == true)
     }
-    @Test func horizonLeanQuiet() {
-        #expect(CameraRules.horizonLean(Fx.camera(8) { _, p in p.structureHorizonTiltDeg = 0.5 }) == nil)
-        #expect(CameraRules.horizonLean(Fx.camera(4) { _, p in p.structureHorizonTiltDeg = 2 }) == nil)
-        #expect(CameraRules.horizonLean(Fx.camera(8)) == nil)
+    @Test func levelEdgeLeanQuiet() {
+        #expect(CameraRules.levelEdgeLean(Fx.camera(8) { _, p in p.structureHorizonTiltDeg = 0.5 }) == nil)
+        #expect(CameraRules.levelEdgeLean(Fx.camera(4) { _, p in p.structureHorizonTiltDeg = 2 }) == nil)
+        #expect(CameraRules.levelEdgeLean(Fx.camera(8)) == nil)
     }
     @Test func shallowHabitFires() {
         let cam = Fx.camera(10) { i, p in if i < 4 { p.mtf50InfocusCPP = 0.3; p.mtf50BackgroundCPP = 0.1 } }
@@ -93,7 +93,7 @@ struct StructureTests {
         var s = ContentSummary(available: true)
         #expect(s.summaryLine == nil)
         s.faceCount = 2; s.textObservationCount = 3; s.horizonDegrees = -1.4
-        #expect(s.summaryLine == "2 faces · text present · horizon 1.4° off level")
+        #expect(s.summaryLine == "2 faces · text present · Vision horizon 1.4° off level")
     }
     @Test func unavailableForMissingFile() {
         let s = ContentIdentifier.analyze(path: "/nonexistent/x.jpg", full: true)

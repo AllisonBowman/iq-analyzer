@@ -38,28 +38,26 @@ struct CameraReportView: View {
 
     private var reportCard: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SectionHeader(title: "Report card", subtitle: "Medians over all \(Fmt.count(camera.photos.count, "photo")). Each tile says what the number is, where it sits, and what good looks like.")
+            SectionHeader(title: "Report card", subtitle: "Each figure counts only the photos that pass its check and says how many of the \(Fmt.count(camera.photos.count, "photo")) it rests on.")
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 250), spacing: 16, alignment: .top)], alignment: .leading, spacing: 16) {
-                MetricTile(metric: .sharpnessLWPH, title: "In-focus sharpness", value: s.sharpnessLWPH,
-                           detail: s.sharpnessCPP.map { "Sharpest-fifth edges, \(Fmt.cpp($0)). Higher is finer detail." })
-                MetricTile(metric: .snr, title: "Noise (SNR)", value: s.snr,
-                           detail: "Mid-grey signal to noise. 35 dB and up is clean; under 25 dB is visibly noisy.")
-                MetricTile(metric: .highlightClip, title: "Blown highlights", value: s.clipHighMedian,
-                           detail: s.clipHighShare.map { "Median share of pixels at pure white. \(Fmt.share($0)) of photos lose more than 1 %." })
-                MetricTile(metric: .overshoot, title: "Sharpening halo", value: s.overshoot,
-                           detail: "Edge overshoot. Under 3 % is natural; over 15 % is a visible halo.")
-                MetricTile(metric: .whiteBalance, title: "Colour lean", value: s.wbLean, detail: leanDetail)
+                // Banded on the per-pixel figure: LW/PH is capped by the picture height, so it carries no band of its own.
+                if s.hasSharpnessFigure, let lwph = s.sharpnessLWPH {
+                    MetricTile(metric: .sharpnessCPP, title: "In-focus sharpness", value: s.sharpnessCPP,
+                               valueText: Metric.sharpnessLWPH.format(lwph), detail: s.sharpnessCaption)
+                } else {
+                    MetricTile(metric: .sharpnessLWPH, title: "In-focus sharpness", value: nil,
+                               valueText: CameraSummary.notEnoughText, detail: s.sharpnessCaption)
+                }
+                MetricTile(metric: .snr, title: "Noise (SNR)", value: s.hasSNRFigure ? s.snr : nil,
+                           valueText: s.hasSNRFigure ? nil : CameraSummary.notEnoughText, detail: s.snrCaption)
+                MetricTile(metric: .highlightClip, title: "Blown highlights", value: s.clipHighMedian, detail: s.clipCaption)
+                MetricTile(metric: .overshoot, title: "Sharpening halo", value: s.hasOvershootFigure ? s.overshoot : nil,
+                           valueText: s.hasOvershootFigure ? nil : CameraSummary.notEnoughText, detail: s.overshootCaption)
+                MetricTile(metric: .whiteBalance, title: "Colour lean", value: s.wbLean, detail: s.leanCaption, banded: false)
                 MetricTile(metric: .dynamicRange, title: "Dynamic range", value: s.dynamicRange,
-                           detail: s.dynamicRangeIsLowerBound ? "Only lower bounds were found, so read this as at least. No pass mark." : "Stops of brightness above the noise floor. No pass mark; it describes the camera.",
-                           prefix: s.dynamicRangeIsLowerBound ? "At least " : "", banded: false)
+                           detail: s.dynamicRangeCaption, prefix: s.dynamicRangePrefix, banded: false)
             }
         }
-    }
-
-    private var leanDetail: String {
-        guard let r = s.wbRStops, let b = s.wbBStops else { return "Gray-world cast of the picture as rendered." }
-        let d = CameraRules.leanDescription(r: r, b: b)
-        return (d.stops > 0.15 ? "Renders \(d.words)." : "Close to neutral.") + " Gray-world cast in stops."
     }
 
     private var charts: some View {

@@ -3,7 +3,7 @@ import Charts
 
 private let isoTicks: [Double] = [50, 100, 200, 400, 800, 1600, 3200]
 
-/// SNR against ISO: a dot per photo, a line through each ISO band's median, the 32 dB "clean" mark.
+/// SNR against ISO: a dot per photo, a line through each ISO band's median, the clean mark (Metric.snrCleanDB).
 struct SNRvsISOChart: View {
     let camera: CameraGroup
 
@@ -26,11 +26,11 @@ struct SNRvsISOChart: View {
                         .foregroundStyle(Color.accentColor)
                         .symbolSize(60)
                 }
-                RuleMark(y: .value("Clean", 32))
+                RuleMark(y: .value("Clean", Metric.snrCleanDB))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
                     .foregroundStyle(.green)
                     .annotation(position: .top, alignment: .trailing) {
-                        Text("32 dB: clean").font(.caption).foregroundStyle(.secondary)
+                        Text("\(Fmt.db(Metric.snrCleanDB)): clean").font(.caption).foregroundStyle(.secondary)
                     }
             }
             .chartXScale(domain: 25...6400, type: .log)
@@ -46,7 +46,7 @@ struct SNRvsISOChart: View {
             .frame(height: 240)
             .accessibilityLabel("Chart of noise against ISO for \(camera.model)")
             .accessibilityValue(camera.summary.snrByBand.map { "\($0.band.label): \(Fmt.db($0.median))" }.joined(separator: ". "))
-            ChartCaption(text: "Each dot is one photo and the blue line joins the median of each ISO band; where the line sinks below the dashed 32 dB mark, grain becomes visible.")
+            ChartCaption(text: "Each dot is one photo with a clean noise reading and the blue line joins the median of each ISO band; where the line sinks below the dashed \(Fmt.db(Metric.snrCleanDB)) mark, grain becomes visible.")
         }
     }
 }
@@ -79,7 +79,7 @@ struct LensSharpnessChart: View {
             .frame(height: CGFloat(max(rows.count, 1)) * 44 + 64)
             .accessibilityLabel("Bar chart of sharpness by lens for \(camera.model)")
             .accessibilityValue(rows.map { "\($0.name): \(Fmt.lwph($0.value))" }.joined(separator: ". "))
-            ChartCaption(text: "The longest bar is the lens that resolves the finest detail; n is the number of photos behind each bar.")
+            ChartCaption(text: "The longest bar is the lens that resolves the finest detail; n is the number of photos with 3 or more usable edges behind each bar. Lenses with none are not drawn.")
         }
     }
 }
@@ -145,7 +145,7 @@ struct LibrarySNRChart: View {
                         .foregroundStyle(by: .value("Camera", s.camera))
                         .symbolSize(40)
                 }
-                RuleMark(y: .value("Clean", 32))
+                RuleMark(y: .value("Clean", Metric.snrCleanDB))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
                     .foregroundStyle(.green)
             }
@@ -161,7 +161,7 @@ struct LibrarySNRChart: View {
             .chartYScale(domain: .automatic(includesZero: false))
             .frame(height: 300)
             .accessibilityLabel("Line chart of median noise against ISO, one line per camera")
-            ChartCaption(text: "A flat line means the camera hides noise as ISO rises; a falling line means grain takes over. The dashed green line is the 32 dB clean mark.")
+            ChartCaption(text: "A flat line means the camera hides noise as ISO rises; a falling line means grain takes over. The dashed green line is the \(Fmt.db(Metric.snrCleanDB)) clean mark.")
         }
     }
 }

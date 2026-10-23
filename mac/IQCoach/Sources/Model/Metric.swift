@@ -34,6 +34,28 @@ enum Metric: String, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
+    // One scale per quantity, used by the bands, the Glossary, the tiles, the charts and the coaching rules.
+    /// SNR below this is visibly noisy (the Poor band).
+    static let snrNoisyDB = 25.0
+    /// SNR at or above this is clean: grain is hard to see at full size (the Good band starts here).
+    static let snrCleanDB = 32.0
+    /// SNR at or above this is excellent.
+    static let snrExcellentDB = 38.0
+    /// Overshoot under this is natural (an unsharpened edge reads about 0.5 to 1.5 %).
+    static let overshootNaturalPct = 3.0
+    /// Overshoot from here is hard sharpening (the Fair band).
+    static let overshootHardPct = 8.0
+    /// Overshoot from here is a visible halo (the Poor band).
+    static let overshootHaloPct = 12.0
+    /// Noise whiteness of white (unsmoothed) noise, from iqa/noise.py.
+    static let whitenessWhite = 0.14
+    /// Whiteness from here: the noise has been smoothed.
+    static let whitenessSmoothed = 0.3
+    /// Whiteness from here: heavily smoothed (iqa/noise.py "0.4+ = heavily correlated / NR'd").
+    static let whitenessHeavy = 0.4
+    /// Whiteness above this: the flat areas are texture, not noise (iqa/noise.py `noise_texture_suspect`).
+    static let whitenessTexture = 0.7
+
     var displayName: String {
         switch self {
         case .sharpnessLWPH: "In-focus sharpness"
@@ -55,7 +77,7 @@ enum Metric: String, CaseIterable, Identifiable, Sendable {
         case .sharpnessLWPH: "How fine a detail the camera resolves where the picture is in focus."
         case .sharpnessCPP: "The same sharpness, counted per pixel so different resolutions compare fairly."
         case .snr: "How much the picture signal stands above the grain, in a flat mid-grey area."
-        case .highlightClip: "Share of the picture that is pure white with no detail."
+        case .highlightClip: "Share of the picture at the top of the range in at least one colour channel, where that channel holds no detail."
         case .shadowClip: "Share of the picture that is pure black with no detail."
         case .overshoot: "How strongly the camera or editor has sharpened edges, shown as a bright fringe."
         case .whiteBalance: "How far greys are rendered toward warm, cool, green or magenta."
@@ -70,19 +92,19 @@ enum Metric: String, CaseIterable, Identifiable, Sendable {
     var definition: String {
         switch self {
         case .sharpnessLWPH, .sharpnessCPP:
-            "MTF50 is the spatial frequency, in cycles per pixel along the edge normal, at which contrast falls to 50 %. Higher is sharper; 0.25-0.35 is very sharp (often sharpened), 0.10-0.15 is soft. It is measured on natural slanted edges with the ISO 12233 e-SFR method, so every figure is a scene-dependent lower bound on the system MTF: consistent across images of similar subjects, not a chart-grade absolute. In-focus sharpness (p80) assumes at least a fifth of the measured edges are in the plane of focus; on a shallow-depth-of-field frame with few in-focus edges it reports the background. LW/PH is line widths per picture height: the c/px figure times the picture height in pixels."
+            "MTF50 is the spatial frequency, in cycles per pixel along the edge normal, at which contrast falls to 50 %. Higher is sharper; 0.25-0.35 is very sharp (often sharpened), 0.10-0.15 is soft. It is measured on natural slanted edges with the ISO 12233 e-SFR method, so every figure is a scene-dependent lower bound on the system MTF: consistent across images of similar subjects, not a chart-grade absolute. In-focus sharpness (p80) is the 80th-percentile edge: it lands on in-focus edges only when they are clearly more than a fifth of the measured edges, so on a shallow-depth-of-field frame with few in-focus edges it can read the background (the photo's sharp-group figure is then the one to read). A photo's figure counts only when at least 3 edges were measured. LW/PH is line widths per picture height: two times the c/px figure times the picture height in pixels (one cycle is two line widths; the height is the short side, as in a landscape frame), so it cannot exceed that height; bands come from the per-pixel figure."
         case .snr:
-            "SNR at mid-grey is 20 x log10(118 / noise std) on the 8-bit luminance of flat patches; 35+ dB is clean, below 25 dB is visibly noisy. 8-bit quantisation alone caps it at about 52 dB. The figure is output-referred: noise reduction and JPEG/HEIC compression lower it as much as the sensor does, so SNR across ISO and formats is partly a chart of processing."
+            "SNR at mid-grey is 20 x log10(118 / noise std) on the 8-bit luminance of flat patches; 32 dB and up is clean (grain is hard to see at full size), 38 dB and up is excellent, below 25 dB is visibly noisy. Photos whose mid-grey was extrapolated, whose flat areas are texture, or that hold a repeating pattern are left out of camera medians. 8-bit quantisation alone caps it at about 52 dB. The figure is output-referred: noise reduction and JPEG/HEIC compression lower it as much as the sensor does, so SNR across ISO and formats is partly a chart of processing."
         case .highlightClip:
-            "Clipping is the share of pixels at the top of the range (any channel at 254 or above). Those pixels hold no detail."
+            "Clipping is the share of pixels at the top of the range (any channel at 254 or above), counted in the file's own encoding. Those pixels hold no detail in the clipped channel; few of them are pure white in all three."
         case .shadowClip:
             "Clipping is the share of pixels at the bottom of the range (all channels at 1 or below). Those pixels hold no detail."
         case .overshoot:
-            "Overshoot is how far the edge profile overshoots its bright plateau, in % of the step: a direct measure of sharpening halo."
+            "Overshoot is how far the edge profile overshoots its bright plateau, in % of the step: a direct measure of sharpening halo. Under 3 % is natural, 8 % and up is hard sharpening, 12 % and up is a visible halo. It counts only on photos with at least 3 measured edges."
         case .whiteBalance:
-            "White balance is the gray-world ratio of linear channel means, expressed in stops. It describes the scene's cast as rendered, which for sunsets and underwater work is intent, not error."
+            "White balance is the gray-world ratio of linear channel means, expressed in stops. It describes the scene's cast as rendered, which for sunsets and underwater work is intent, not error. A photo's lean is the larger of |R/G| and |B/G|; a camera's lean is the larger of its median R/G and median B/G, its typical rendering, which is smaller than the typical photo's lean because each scene adds its own cast."
         case .whiteness:
-            "Noise whiteness near 0.14 means white noise; 0.3+ means the noise has been smoothed by noise reduction or compression. This is informational: it says how the noise looks, not whether it is good."
+            "Noise whiteness near 0.14 means white noise; 0.3 and up means the noise has been smoothed by noise reduction or compression, 0.4 and up heavily; above 0.7 the flat areas are texture rather than noise. At low noise, scene texture also raises it, so it reads high at base ISO even without noise reduction. This is informational: it says how the noise looks, not whether it is good."
         case .dynamicRange:
             "Dynamic range is output-referred: the stops between near-white and the darkest level whose scene-linear SNR still exceeds the threshold. A JPEG's tone curve bounds it, and the floor can only be found in frames that contain near-black flat areas; lower-bound rows are excluded from the medians and shown as 'at least'."
         case .tonalRange:
@@ -94,13 +116,13 @@ enum Metric: String, CaseIterable, Identifiable, Sendable {
 
     var goodLooksLike: String {
         switch self {
-        case .sharpnessLWPH: "Excellent from 3500 LW/PH; poor below 1500."
+        case .sharpnessLWPH: "No band of its own: LW/PH is capped by the picture height, so the band comes from the per-pixel figure. Use LW/PH to compare cameras."
         case .sharpnessCPP: "Excellent from 0.30 c/px; poor below 0.12."
-        case .snr: "Clean from 38 dB; visibly noisy below 25 dB."
+        case .snr: "Clean from 32 dB; excellent from 38 dB; visibly noisy below 25 dB."
         case .highlightClip, .shadowClip: "Excellent below 0.1 %; poor from 2 %."
-        case .overshoot: "Excellent below 3 %; poor from 15 %."
+        case .overshoot: "Natural below 3 %; hard sharpening from 8 %; a visible halo from 12 %."
         case .whiteBalance: "Excellent below 0.1 stops; poor from 0.4 stops."
-        case .whiteness: "0.14 is white grain; 0.5 and above is heavily smoothed."
+        case .whiteness: "0.14 is white grain; 0.3 and up smoothed; 0.4 and up heavily smoothed; above 0.7 texture, not noise."
         case .dynamicRange: "More stops is better; there is no pass mark."
         case .tonalRange: "7 stops or more reads as full-bodied; under 7 looks flat."
         case .colorfulness: "No pass mark; it describes the scene."
@@ -127,7 +149,7 @@ enum Metric: String, CaseIterable, Identifiable, Sendable {
         case .highlightClip, .shadowClip: 0...4
         case .overshoot: 0...25
         case .whiteBalance: 0...0.6
-        case .whiteness: 0.1...0.6
+        case .whiteness: 0.1...0.8
         case .dynamicRange: 0...12
         case .tonalRange: 0...12
         case .colorfulness: 0...60
@@ -145,11 +167,13 @@ enum Metric: String, CaseIterable, Identifiable, Sendable {
     /// Band thresholds from the spec. Informational metrics have no band.
     func band(for value: Double) -> Band? {
         switch self {
-        case .sharpnessLWPH: Self.higherBand(value, 1500, 2500, 3500)
+        // LW/PH is not banded: it is capped by the picture height, so the same lens reads lower on a smaller frame.
+        // The per-pixel figure (LW/PH / height = 2 x c/px) carries the band for both.
+        case .sharpnessLWPH: nil
         case .sharpnessCPP: Self.higherBand(value, 0.12, 0.20, 0.30)
-        case .snr: Self.higherBand(value, 25, 32, 38)
+        case .snr: Self.higherBand(value, Self.snrNoisyDB, Self.snrCleanDB, Self.snrExcellentDB)
         case .highlightClip, .shadowClip: Self.lowerBand(value, 0.1, 0.5, 2)
-        case .overshoot: Self.lowerBand(value, 3, 8, 15)
+        case .overshoot: Self.lowerBand(value, Self.overshootNaturalPct, Self.overshootHardPct, Self.overshootHaloPct)
         case .whiteBalance: Self.lowerBand(value, 0.1, 0.2, 0.4)
         case .whiteness, .dynamicRange, .tonalRange, .colorfulness: nil
         }

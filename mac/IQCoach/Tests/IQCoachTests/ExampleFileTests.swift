@@ -47,9 +47,11 @@ struct ExampleFileTests {
         #expect(r?.exampleCaptions.first?.hasPrefix("0.20") == true)
     }
 
-    @Test func sharpeningPicksHighestOvershoot() {
+    @Test func sharpeningPicksRepresentativeOvershoot() {
+        // Representative, not extreme (F13): the four closest to the median of 9...20 (14.5).
         let cam = Fx.camera(12) { i, p in p.overshootMedianPct = 9 + Double(i) }
-        check(CameraRules.sharpeningCharacter(cam), files: ["p11.jpg", "p10.jpg", "p9.jpg", "p8.jpg"])
+        guard let r = CameraRules.sharpeningCharacter(cam) else { Issue.record("rule did not fire"); return }
+        #expect(Set(r.exampleFiles) == ["p4.jpg", "p5.jpg", "p6.jpg", "p7.jpg"])
     }
 
     @Test func colourLeanPicksLargestLeans() {
@@ -78,12 +80,14 @@ struct ExampleFileTests {
         #expect(r.exampleFiles.suffix(2).allSatisfy { laggard.contains($0) })
     }
 
-    @Test func horizonLeanPicksLargestTiltsWithTrueMinusSign() {
+    @Test func levelEdgeLeanPicksLargestTiltsOnTheMediansSide() {
+        // The median leans right, so the left-leaning p5 is a counter-example and is not shown (F8).
         let cam = Fx.camera(12) { i, p in p.structureHorizonTiltDeg = i == 5 ? -4.0 : 1.5 + 0.1 * Double(i) }
-        let r = CameraRules.horizonLean(cam)
-        check(r, files: ["p5.jpg", "p11.jpg", "p10.jpg", "p9.jpg"])
-        #expect(r?.exampleCaptions.first == "\u{2212}4.0\u{00B0}")
-        #expect(r?.exampleCaptions.last == "+2.4\u{00B0}")
+        let r = CameraRules.levelEdgeLean(cam)
+        check(r, files: ["p11.jpg", "p10.jpg", "p9.jpg", "p8.jpg"])
+        #expect(r?.exampleCaptions.first == "+2.6\u{00B0}")
+        let leftCam = Fx.camera(12) { i, p in p.structureHorizonTiltDeg = i == 5 ? 4.0 : -1.5 - 0.1 * Double(i) }
+        #expect(CameraRules.levelEdgeLean(leftCam)?.exampleCaptions.first == "\u{2212}2.6\u{00B0}")
     }
 
     @Test func shallowDepthPicksWidestFocusGap() {
@@ -96,16 +100,6 @@ struct ExampleFileTests {
     @Test func noiseCharacterPicksRepresentativePhotos() {
         let cam = Fx.camera(12) { i, p in p.noiseWhiteness = 0.1 + 0.01 * Double(i) }
         guard let r = CameraRules.noiseCharacter(cam) else { Issue.record("rule did not fire"); return }
-        #expect(r.exampleFiles.count == 4)
-        #expect(Set(r.exampleFiles) == ["p4.jpg", "p5.jpg", "p6.jpg", "p7.jpg"])
-    }
-
-    @Test func sharpnessConfidencePicksRepresentativePhotos() {
-        let cam = Fx.camera(12) { i, p in
-            let w = 0.6 + 0.01 * Double(i)
-            p.mtf50MedianCPP = 0.3; p.mtf50MedianCILo = 0.3 - 0.15 * w; p.mtf50MedianCIHi = 0.3 + 0.15 * w
-        }
-        guard let r = CameraRules.sharpnessConfidence(cam) else { Issue.record("rule did not fire"); return }
         #expect(r.exampleFiles.count == 4)
         #expect(Set(r.exampleFiles) == ["p4.jpg", "p5.jpg", "p6.jpg", "p7.jpg"])
     }

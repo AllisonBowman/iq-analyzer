@@ -28,15 +28,25 @@ struct ClippingMask: @unchecked Sendable {
         return (tint, high, low)
     }
 
-    /// Draws `source` into an sRGB RGBA8 buffer and builds the mask. nil when the image has no pixels or a context cannot be made.
+    /// The colour space the pixels are classified in: the image's own RGB space, so a Display P3 file is judged in
+    /// P3 as the analyzer does (iqa/imageio.py, clipping in the file's own encoding). Drawing a P3 picture into sRGB
+    /// would clip its out-of-gamut colours to 255 and paint them as blown. Falls back to sRGB for non-RGB images.
+    static func classificationSpace(for source: CGImage) -> CGColorSpace? {
+        if let own = source.colorSpace, own.model == .rgb, own.supportsOutput { return own }
+        return CGColorSpace(name: CGColorSpace.sRGB)
+    }
+
+    /// Draws `source` into an RGBA8 buffer in its own colour space and builds the mask. nil when the image has no
+    /// pixels or a context cannot be made.
     static func make(from source: CGImage) -> ClippingMask? {
         let w = source.width, h = source.height
-        guard w > 0, h > 0, let space = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
+        guard w > 0, h > 0, let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let drawSpace = classificationSpace(for: source) else { return nil }
         let info = CGImageAlphaInfo.premultipliedLast.rawValue
         var rgba = [UInt8](repeating: 0, count: w * h * 4)
         let drawn = rgba.withUnsafeMutableBytes { buf -> Bool in
             guard let ctx = CGContext(data: buf.baseAddress, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
-                                      space: space, bitmapInfo: info) else { return false }
+                                      space: drawSpace, bitmapInfo: info) else { return false }
             ctx.draw(source, in: CGRect(x: 0, y: 0, width: w, height: h))
             return true
         }

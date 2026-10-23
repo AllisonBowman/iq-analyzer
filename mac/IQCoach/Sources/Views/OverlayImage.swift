@@ -14,7 +14,7 @@ enum PhotoOverlay: Hashable, Sendable {
         case .clipping: "Clipping"
         case .focusMap: "Focus map"
         case .subject: "Subject"
-        case .horizon: "Horizon"
+        case .horizon: "Level edge"
         }
     }
 }
@@ -122,7 +122,9 @@ struct OverlayImage: View {
             return nil
         case .clipping:
             guard p.clipHighPct != nil || p.clipLowPct != nil else { return "Clipping was not measured for this photo." }
-            return "Red: blown highlights (\(Fmt.pct(p.clipHighPct ?? 0, 2)) of pixels). Blue: crushed shadows (\(Fmt.pct(p.clipLowPct ?? 0, 2)))."
+            // The percentages are the analyzer's, over every pixel of the file; the red and blue areas are drawn on
+            // the 800 px preview, in the file's own colours, so they show where, not exactly how much.
+            return "Red: blown in at least one colour channel; blue: crushed shadows. The areas are drawn on a \(loadPixel) px preview in the file's own colours, so they show where; the figures are the analyzer's, on the full-resolution file: \(Fmt.pct(p.clipHighPct ?? 0, 2)) blown, \(Fmt.pct(p.clipLowPct ?? 0, 2)) crushed."
         case .focusMap:
             return Structure.focusCaption(p) ?? "Focus map needs a results file from iqa 0.2 or later."
         case .subject:
@@ -130,7 +132,7 @@ struct OverlayImage: View {
             if let d = p.structureThirdsDistance { s += "; thirds distance \(Fmt.num(d, 2))" }
             return s
         case .horizon(let deg):
-            return "The line shows the tilt found in this photo: \(Fmt.num(abs(deg), 1))°."
+            return "The line shows the level-edge tilt found in this photo: \(Fmt.num(abs(deg), 1))°."
         }
     }
 }

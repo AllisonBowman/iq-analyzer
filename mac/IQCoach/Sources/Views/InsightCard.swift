@@ -46,7 +46,7 @@ struct InsightCard: View {
                 }
                 examplesStrip
                 Divider()
-                Text("Based on \(Fmt.count(insight.basedOn, "photo"))")
+                Text(insight.countedText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

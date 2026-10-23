@@ -35,9 +35,10 @@ struct PhotoDetailView: View {
             }
             block("Noise") {
                 row(.snr); row(.whiteness)
-                if photo.noisePeriodicSuspect == true {
-                    Label("A repeating pattern was found in the flat areas, so the noise figure describes the pattern.", systemImage: "exclamationmark.triangle")
+                if let note = PhotoReading.noiseNote(photo) {
+                    Label(note, systemImage: "exclamationmark.triangle")
                         .font(.callout)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             block("Exposure and colour") {
@@ -130,7 +131,7 @@ struct PhotoDetailView: View {
 
     private func title(for a: EditingAdvice) -> String {
         a.metric?.displayName ?? (a.id.hasPrefix("dark") ? "Exposure: dark" : a.id.hasPrefix("bright") ? "Exposure: bright"
-            : a.id.hasPrefix("straighten") ? "Horizon" : a.id.hasPrefix("thirds") ? "Composition"
+            : a.id.hasPrefix("straighten") ? "Level edge" : a.id.hasPrefix("thirds") ? "Composition"
             : a.id.hasPrefix("shallow") ? "Shallow depth of field" : "Moire")
     }
 
@@ -155,9 +156,11 @@ struct PhotoDetailView: View {
         let v = m.value(of: photo)
         LabeledContent {
             HStack(spacing: 8) {
-                if let v {
+                if let gated = PhotoReading.notCountedText(m, photo) {
+                    Text(gated).monospacedDigit().foregroundStyle(.secondary)
+                } else if let v {
                     Text(valueText(m, v)).monospacedDigit()
-                    if let b = m.band(for: v) { BandCapsule(band: b) }
+                    if let b = PhotoReading.band(m, photo) { BandCapsule(band: b) }
                 } else {
                     Text("Not measured").foregroundStyle(.secondary)
                 }
@@ -174,6 +177,58 @@ struct PhotoDetailView: View {
 
     private func valueText(_ m: Metric, _ v: Double) -> String {
         if m == .dynamicRange && photo.drSNR4LowerBound == true { return "At least " + m.format(v) }
+        if (m == .sharpnessLWPH || m == .sharpnessCPP), let n = photo.edgesMeasured { return m.format(v) + " · " + Fmt.count(n, "edge") }
         return m.format(v)
+    }
+}
+
+/// How one photo's measurements are shown: with the analyzer's validity gates, so a figure the camera medians
+/// leave out is not banded as if it counted. Pure, so the tests can pin it.
+enum PhotoReading {
+    /// The band for a photo's row, or nil when the metric is unbanded or the reading does not count.
+    /// Both sharpness rows take the per-pixel band (LW/PH is capped by the picture height).
+    static func band(_ m: Metric, _ p: PhotoRecord) -> Band? {
+        if notCountedText(m, p) != nil { return nil }
+        switch m {
+        case .sharpnessLWPH, .sharpnessCPP: return p.mtf50P80CPP.flatMap { Metric.sharpnessCPP.band(for: $0) }
+        case .snr: return p.snrIsClean ? p.snrMidgreyDB.flatMap { m.band(for: $0) } : nil
+        default: return m.value(of: p).flatMap { m.band(for: $0) }
+        }
+    }
+
+    /// Replaces the value when it rests on too few edges: "— · only 1 edge, not enough to count".
+    static func notCountedText(_ m: Metric, _ p: PhotoRecord) -> String? {
+        guard [.sharpnessLWPH, .sharpnessCPP, .overshoot].contains(m), m.value(of: p) != nil, !p.hasSharpnessFigure else { return nil }
+        return "— · only \(Fmt.count(p.edgesMeasured ?? 0, "edge")), not enough to count"
+    }
+
+    /// Why the noise figure is not a sensor-noise reading, when it is not.
+    static func noiseNote(_ p: PhotoRecord) -> String? {
+        guard p.snrMidgreyDB != nil else { return nil }
+        if p.snrMidgreyExtrapolated == true {
+            return "Measured at a different grey level and extrapolated to mid-grey, so it is not banded and the camera medians leave it out."
+        }
+        if p.noiseTextureSuspect == true {
+            return "The flat areas are texture or heavy smoothing rather than sensor noise (whiteness above \(Fmt.num(Metric.whitenessTexture, 1))), so the figure is not banded and the camera medians leave it out."
+        }
+        if p.noisePeriodicSuspect == true {
+            return "A repeating pattern was found in the flat areas. Where it covered a minority of them it was removed before measuring; otherwise the figure describes the pattern. The camera medians leave this photo out."
+        }
+        return nil
+    }
+
+    /// "2,608 LW/PH · Good · 5 edges", or "— · 1 edge" when too few edges were measured to count.
+    static func sharpnessText(_ p: PhotoRecord) -> String {
+        guard let v = p.mtf50P80LWPH else { return "Not measured" }
+        let edges = Fmt.count(p.edgesMeasured ?? 0, "edge")
+        guard p.hasSharpnessFigure else { return "— · \(edges)" }
+        return Metric.sharpnessLWPH.format(v) + (band(.sharpnessLWPH, p).map { " · \($0.word)" } ?? "") + " · \(edges)"
+    }
+
+    /// The SNR with its band, or without one (and "not counted") when the reading is left out of the medians.
+    static func snrText(_ p: PhotoRecord) -> String {
+        guard let v = p.snrMidgreyDB else { return "Not measured" }
+        guard p.snrIsClean else { return Metric.snr.format(v) + " · not counted" }
+        return Metric.snr.format(v) + (Metric.snr.band(for: v).map { " · \($0.word)" } ?? "")
     }
 }

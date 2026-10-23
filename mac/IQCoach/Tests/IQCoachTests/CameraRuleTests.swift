@@ -25,7 +25,7 @@ struct CameraRuleTests {
     @Test func noiseCharacterStrong() {
         let r = CameraRules.noiseCharacter(Fx.camera { _, p in p.noiseWhiteness = 0.5 })
         #expect(r?.severity == .notice)
-        #expect(r?.finding.contains("strong smoothing") == true)
+        #expect(r?.finding.contains("smooths noise strongly") == true)
     }
     @Test func noiseCharacterGrainIsInfoOnly() {
         let r = CameraRules.noiseCharacter(Fx.camera { _, p in p.noiseWhiteness = 0.15 })
@@ -134,14 +134,10 @@ struct CameraRuleTests {
         #expect(CameraRules.apertureSweetSpot(Fx.camera(8)).isEmpty)
     }
 
-    // 10. Confidence
-    @Test func confidenceFires() {
-        let r = CameraRules.sharpnessConfidence(Fx.camera { _, p in p.mtf50MedianCPP = 0.2; p.mtf50MedianCILo = 0.12; p.mtf50MedianCIHi = 0.30 })
-        #expect(r?.severity == .info)
-        #expect(r?.finding.contains("90 %") == true)
-    }
-    @Test func confidenceQuiet() {
-        #expect(CameraRules.sharpnessConfidence(Fx.camera { _, p in p.mtf50MedianCPP = 0.2; p.mtf50MedianCILo = 0.18; p.mtf50MedianCIHi = 0.22 }) == nil)
+    // 10. Confidence: the card is gone (F10); its content is the p80 range in the sharpness tile caption.
+    @Test func noConfidenceCardEvenWithWideIntervals() {
+        let cam = Fx.camera { _, p in p.mtf50MedianCPP = 0.2; p.mtf50MedianCILo = 0.12; p.mtf50MedianCIHi = 0.30 }
+        #expect(!CoachingEngine.insights(for: cam).contains { $0.id.hasPrefix("sharpness-confidence") })
     }
 
     // Engine

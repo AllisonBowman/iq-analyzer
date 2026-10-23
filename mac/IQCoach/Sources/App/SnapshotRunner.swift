@@ -16,8 +16,9 @@ enum SnapshotRunner {
             let library = PhotoLibrary(sourceName: URL(fileURLWithPath: input).lastPathComponent, photos: photos)
             let dir = URL(fileURLWithPath: outputDirectory, isDirectory: true)
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            // The photo screen shows a clipped photo that has a file, so the Clipping overlay has something to show:
-            // of the ten photos the analyzer says are most clipped, the one whose 800 px thumbnail really has the most blown pixels.
+            // The photo screen shows a clipped photo whose file is on disk, so the Clipping overlay has something to show:
+            // of the ten such photos the analyzer says are most clipped, the one whose 800 px thumbnail has the most blown
+            // pixels. When no photo's file exists, a warning is printed and the first photo stands in.
             guard let cam = library.cameras.first(where: { $0.representativePhoto != nil }) ?? library.cameras.first,
                   let photo = Self.mostVisiblyClipped(library.photos) ?? cam.photos.sorted(by: { $0.file < $1.file }).first else {
                 FileHandle.standardError.write(Data("No photos in \(input)\n".utf8)); return 1
@@ -56,12 +57,21 @@ enum SnapshotRunner {
     }
 
     private static func mostVisiblyClipped(_ photos: [PhotoRecord]) -> PhotoRecord? {
-        let candidates = photos.filter { $0.path != nil }.sorted { ($0.clipHighPct ?? 0) > ($1.clipHighPct ?? 0) }.prefix(10)
+        let candidates = clippedCandidates(photos, exists: { FileManager.default.fileExists(atPath: $0) })
+        if candidates.isEmpty {
+            FileHandle.standardError.write(Data("warning: no photo in these results has its file on disk; the photo screen shows a placeholder\n".utf8))
+            return nil
+        }
         func blown(_ p: PhotoRecord) -> Int {
             guard let img = ThumbnailStore.loadSynchronously(path: p.path ?? "", maxPixel: OverlayImage.loadPixel) else { return 0 }
             return ClippingMask.make(from: img)?.highCount ?? 0
         }
         return candidates.max { blown($0) < blown($1) }
+    }
+
+    /// The ten most clipped photos whose file exists, most clipped first.
+    nonisolated static func clippedCandidates(_ photos: [PhotoRecord], exists: (String) -> Bool) -> [PhotoRecord] {
+        Array(photos.filter { $0.path.map(exists) == true }.sorted { ($0.clipHighPct ?? 0) > ($1.clipHighPct ?? 0) }.prefix(10))
     }
 
     private static func slug(_ s: String) -> String {

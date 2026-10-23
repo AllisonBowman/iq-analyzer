@@ -34,12 +34,12 @@ Press Validate: it checks the file exists and that `python -c "import iqa"` work
 build/Build/Products/Debug/IQCoach.app/Contents/MacOS/IQCoach --snapshot ../../results/results.json /tmp/iqcoach-snaps
 ```
 
-Writes `library.png`, `camera-<first camera>.png`, `photo-<the most visibly clipped photo>.png` (rendered with the Clipping overlay selected), `glossary.png` at 1400 pt wide, 2x. Tall screens are drawn unrolled to full height. AppKit-backed controls (Table, List, GroupBox content, segmented Picker, Form) cannot draw off-screen, so snapshots substitute plain-view equivalents; the live app uses the real controls.
+Writes `library.png`, `camera-<first camera>.png`, `photo-<the most visibly clipped photo whose file is on disk>.png` (rendered with the Clipping overlay selected; when no photo's file exists it warns and shows a placeholder), `glossary.png` at 1400 pt wide, 2x. Tall screens are drawn unrolled to full height. AppKit-backed controls (Table, List, GroupBox content, segmented Picker, Form) cannot draw off-screen, so snapshots substitute plain-view equivalents; the live app uses the real controls.
 
 ## Layout
 
 - `Sources/Model`: PhotoRecord (NaN-tolerant decoding), Metric and bands, camera/lens grouping and summaries.
-- `Sources/Coaching`: the twelve camera rules and twelve photo editing rules, pure functions.
+- `Sources/Coaching`: the twelve camera rules (isoCeiling, noiseCharacter, lensComparison, fieldSoftness, highlightDiscipline, shadowDiscipline, sharpeningCharacter, colourLean, slowShutter, levelEdgeLean, shallowDepthHabit, apertureSweetSpot; the former sharpnessConfidence card was removed) and twelve photo editing rules, pure functions. Each figure uses the analyzer's validity gates (three valid edges for sharpness, halo and centre/outer; a clean SNR reading for noise).
 - `Sources/Views`, `Sources/App`, `Sources/Support`: UI, app entry and snapshot runner, analyzer process and formatting.
 - `Tests/IQCoachTests`: Swift Testing tests (every rule fires and stays quiet, band boundaries, decoding).
 
@@ -59,4 +59,6 @@ picker with previews of the library; up to 20 photos can be selected. The picker
 so no Photos permission is needed. The chosen originals are copied, EXIF intact, to
 `~/Library/Application Support/IQCoach/photos/<stamp>/` and analysed from there; the library is never
 modified. `IQCoach --analyze-photos N` (a launch flag for automation) still uses PhotoKit to take the N
-newest camera photos and does ask for read access.
+newest camera captures and does ask for read access. A capture is what `iqa/select_captures.py` keeps: a file
+with an EXIF camera model and at least 5 MP; screenshots, saved images and thumbnails are skipped and scanning
+continues until N captures are copied.

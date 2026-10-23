@@ -44,9 +44,14 @@ struct Insight: Identifiable, Hashable, Sendable {
     /// `file` values of up to four photos that best show the point, and a caption for each (the value that made it an example).
     var exampleFiles: [String] = []
     var exampleCaptions: [String] = []
+    /// Photos the finding rests on: those that passed the rule's gates in every group it compares.
+    /// Each rule sets it; it is not the largest evidence row.
+    var counted: Int = 0
+    /// Photos from this camera (or lens) that the rule looked at, before its gates.
+    var total: Int = 0
 
-    /// The "Based on n photos" footer: the largest evidence count.
-    var basedOn: Int { evidence.map(\.n).max() ?? 0 }
+    /// The footer: "Counted: 43 of 206 photos".
+    var countedText: String { "Counted: \(counted.formatted()) of \(Fmt.count(total, "photo"))" }
 }
 
 /// One piece of per-photo editing advice, worded for each editor.

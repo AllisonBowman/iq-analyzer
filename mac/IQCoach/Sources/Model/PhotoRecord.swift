@@ -18,11 +18,15 @@ struct PhotoRecord: Codable, Identifiable, Sendable, Hashable {
     var isRaw: Bool? = nil
     var colorProfile: String? = nil
     var edgesMeasured: Int? = nil
+    var edgesCenter: Int? = nil
+    var edgesOuter: Int? = nil
     var mtf50MedianCPP: Double? = nil
     var mtf50MedianCILo: Double? = nil
     var mtf50MedianCIHi: Double? = nil
     var mtf50P80CPP: Double? = nil
     var mtf50P80LWPH: Double? = nil
+    var mtf50P80CILo: Double? = nil
+    var mtf50P80CIHi: Double? = nil
     var mtf50CenterMedianCPP: Double? = nil
     var mtf50OuterMedianCPP: Double? = nil
     var mtf50pMedianCPP: Double? = nil
@@ -37,6 +41,7 @@ struct PhotoRecord: Codable, Identifiable, Sendable, Hashable {
     var drSNR4LowerBound: Bool? = nil
     var clipHighPct: Double? = nil
     var clipLowPct: Double? = nil
+    var clipGamutPct: Double? = nil
     var lumaP50: Double? = nil
     var tonalRangeStops: Double? = nil
     var wbROverGStops: Double? = nil
@@ -70,11 +75,15 @@ struct PhotoRecord: Codable, Identifiable, Sendable, Hashable {
         case isRaw = "is_raw"
         case colorProfile = "color_profile"
         case edgesMeasured = "edges_measured"
+        case edgesCenter = "edges_center"
+        case edgesOuter = "edges_outer"
         case mtf50MedianCPP = "mtf50_median_cpp"
         case mtf50MedianCILo = "mtf50_median_ci_lo_cpp"
         case mtf50MedianCIHi = "mtf50_median_ci_hi_cpp"
         case mtf50P80CPP = "mtf50_p80_cpp"
         case mtf50P80LWPH = "mtf50_p80_lwph"
+        case mtf50P80CILo = "mtf50_p80_ci_lo_cpp"
+        case mtf50P80CIHi = "mtf50_p80_ci_hi_cpp"
         case mtf50CenterMedianCPP = "mtf50_center_median_cpp"
         case mtf50OuterMedianCPP = "mtf50_outer_median_cpp"
         case mtf50pMedianCPP = "mtf50p_median_cpp"
@@ -89,6 +98,7 @@ struct PhotoRecord: Codable, Identifiable, Sendable, Hashable {
         case drSNR4LowerBound = "dr_snr4_lower_bound"
         case clipHighPct = "clip_high_pct"
         case clipLowPct = "clip_low_pct"
+        case clipGamutPct = "clip_gamut_pct"
         case lumaP50 = "luma_p50"
         case tonalRangeStops = "tonal_range_stops"
         case wbROverGStops = "wb_r_over_g_stops"
@@ -163,6 +173,11 @@ extension PhotoRecord {
         mtf50InfocusCPP = num(.mtf50InfocusCPP)
         mtf50BackgroundCPP = num(.mtf50BackgroundCPP)
         infocusEdgeShare = num(.infocusEdgeShare)
+        edgesCenter = int(.edgesCenter)
+        edgesOuter = int(.edgesOuter)
+        mtf50P80CILo = num(.mtf50P80CILo)
+        mtf50P80CIHi = num(.mtf50P80CIHi)
+        clipGamutPct = num(.clipGamutPct)
     }
 }
 
@@ -179,18 +194,56 @@ extension PhotoRecord {
         return Self.exifFormatter.date(from: datetime)
     }
 
-    /// True when the SNR figure is a trustworthy sensor/processing measurement.
+    /// True when the SNR figure is a trustworthy sensor/processing measurement. Mirrors iqa/report.py `_noise_ok`:
+    /// extrapolated, texture-suspect and periodic-suspect rows are left out.
     var snrIsClean: Bool {
         snrMidgreyDB != nil && snrMidgreyExtrapolated != true && noisePeriodicSuspect != true && noiseTextureSuspect != true
     }
 
-    /// Relative width of the sharpness confidence interval (hi - lo) / median.
-    var relativeCIWidth: Double? {
-        guard let lo = mtf50MedianCILo, let hi = mtf50MedianCIHi, let m = mtf50MedianCPP, m > 0 else { return nil }
+    /// Why this row's SNR is left out of the medians, or nil when it counts (or was not measured).
+    var snrExclusionReason: String? {
+        guard snrMidgreyDB != nil else { return nil }
+        if snrMidgreyExtrapolated == true { return "measured at a different grey level and extrapolated to mid-grey" }
+        if noiseTextureSuspect == true { return "the flat areas are texture or heavy smoothing, not sensor noise" }
+        if noisePeriodicSuspect == true { return "a repeating pattern was found in the flat areas" }
+        return nil
+    }
+
+    /// Fewest valid edges a photo needs before its sharpness, halo and centre/outer figures count (iqa/report.py `_sharp_ok`).
+    static let minEdgesForSharpness = 3
+
+    /// True when the photo has a sharpness figure the analyzer itself would use: at least three valid edges.
+    var hasSharpnessFigure: Bool { (edgesMeasured ?? 0) >= Self.minEdgesForSharpness }
+
+    /// p80 sharpness in LW/PH, only when the photo has enough edges for it to count.
+    var gatedSharpnessLWPH: Double? { hasSharpnessFigure ? mtf50P80LWPH : nil }
+    /// p80 sharpness in c/px, gated the same way.
+    var gatedSharpnessCPP: Double? { hasSharpnessFigure ? mtf50P80CPP : nil }
+    /// Edge overshoot (sharpening halo), gated the same way.
+    var gatedOvershoot: Double? { hasSharpnessFigure ? overshootMedianPct : nil }
+
+    /// Outer-to-centre sharpness ratio, only when both regions have at least three valid edges.
+    var gatedOuterCentreRatio: Double? {
+        guard (edgesCenter ?? 0) >= Self.minEdgesForSharpness, (edgesOuter ?? 0) >= Self.minEdgesForSharpness,
+              let c = mtf50CenterMedianCPP, let o = mtf50OuterMedianCPP, c > 0 else { return nil }
+        return o / c
+    }
+
+    /// The p80 sharpness range (95 % interval) in LW/PH: 2 x c/px x the short side, as the analyzer computes
+    /// `mtf50_p80_lwph` (picture height in landscape orientation).
+    var p80RangeLWPH: ClosedRange<Double>? {
+        guard let lo = mtf50P80CILo, let hi = mtf50P80CIHi, let w = width, let h = height, lo <= hi else { return nil }
+        let side = Double(min(w, h))
+        return (2 * lo * side)...(2 * hi * side)
+    }
+
+    /// Width of the p80 interval relative to the p80 figure itself.
+    var p80RelativeWidth: Double? {
+        guard let lo = mtf50P80CILo, let hi = mtf50P80CIHi, let m = mtf50P80CPP, m > 0 else { return nil }
         return (hi - lo) / m
     }
 
-    /// Larger of |R/G| and |B/G| in stops.
+    /// The colour lean of one photo: the larger of |R/G| and |B/G| in stops.
     var wbLeanStops: Double? {
         guard wbROverGStops != nil || wbBOverGStops != nil else { return nil }
         return max(abs(wbROverGStops ?? 0), abs(wbBOverGStops ?? 0))

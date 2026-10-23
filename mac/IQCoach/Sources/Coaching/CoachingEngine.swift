@@ -14,11 +14,12 @@ enum CoachingEngine {
             CameraRules.sharpeningCharacter(cam),
             CameraRules.colourLean(cam),
             CameraRules.slowShutter(cam),
-            CameraRules.horizonLean(cam),
+            CameraRules.levelEdgeLean(cam),
             CameraRules.shallowDepthHabit(cam),
         ]
         out += CameraRules.apertureSweetSpot(cam)
-        out.append(CameraRules.sharpnessConfidence(cam))
+        // The former "Read single-photo sharpness loosely" card quoted the median-MTF50 interval while every
+        // sharpness figure shown is p80; its content now sits in the sharpness tile caption, from the p80 range.
         return out.compactMap { $0 }.enumerated()
             .sorted { $0.element.severity != $1.element.severity ? $0.element.severity > $1.element.severity : $0.offset < $1.offset }
             .map(\.element)

@@ -7,6 +7,9 @@ enum Fx {
                       _ edit: (inout PhotoRecord) -> Void = { _ in }) -> PhotoRecord {
         var p = PhotoRecord(file: "p\(n).jpg", cameraMake: "Apple", cameraModel: camera, lens: lens)
         p.iso = 50; p.exposureS = 0.004; p.fNumber = 1.8; p.focalMM = 6
+        p.width = 3024; p.height = 4032
+        // Enough edges for every sharpness figure to count (iqa/report.py _sharp_ok needs 3, and 3 per region).
+        p.edgesMeasured = 6; p.edgesCenter = 3; p.edgesOuter = 3
         p.mtf50P80CPP = 0.30; p.mtf50P80LWPH = 3000; p.overshootMedianPct = 4
         p.snrMidgreyDB = 40; p.snrMidgreyExtrapolated = false; p.noiseWhiteness = 0.3
         p.noiseTextureSuspect = false; p.noisePeriodicSuspect = false
