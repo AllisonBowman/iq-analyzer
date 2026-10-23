@@ -20,7 +20,7 @@ Spec date: 2026-10-15. Base: "One change first, the proof second, the method on 
 
 **What is dropped.** Everything any judge called untruthful (list in §8).
 
-**How the numbers were checked.** Every number below was recomputed from `results/results.json` (written 15 Oct 2026 08:37, fifth run, 389 rows, 19 cameras) with `.venv/bin/python`. It was also checked against the Swift sources under `mac/IQCoach/Sources`. Two judge corrections did not reproduce:
+**How the numbers were checked.** Every number below was recomputed from `results/results.json` (fifth run, 389 rows, 19 cameras; rewritten 23 Oct 2026 04:36 after two corrections: `clip_low_pct` restored to the all-channels definition, and `mtf50_p80_lwph` put on the short side, FINDINGS §8 and §9) with `.venv/bin/python`. The first version of this spec (15 Oct) quoted the withdrawn any-channel shadow counts and height-based LW/PH; on current data the shadows rule fires for none of the four main cameras, which changes the one thing for the NIKON D850 and the iPhone XR and the "Next up" line for both iPhones. It was also checked against the Swift sources under `mac/IQCoach/Sources`. Two judge corrections did not reproduce:
 - The gated sharpening halo on the iPhone 17 Pro Max is 10.7 % over 43 photos, not 11.1 % over 42. It matches FINDINGS §2.
 - `mac/IQCoach/README.md` states no test count. The stale "43" is in `CLAUDE.md`; the real count is 77 `@Test`s.
 
@@ -106,23 +106,20 @@ The same sentence appears as a "One thing" column in the Library table, as the `
 - Sentence: "**Expose for the highlights.** 54 of your 206 photos (26 %) have more than 1 % of the frame blown to pure white, and a JPEG or HEIC cannot bring that back."
 - Capsule: "Worth acting on · Solid · 206 photos". Effort: "At the camera".
 - Action: "On bright scenes, tap the subject and drag the sun slider down before you shoot."
-- Next up: "Next up: crushed shadows. 117 of 206 photos (57 %) have more than 1 % pure black. Dark areas are often the look; if they are, say so on that card."
+- Next up: no second card is eligible (shadows are silent at 17 of 206 photos, 8 %; the smoothing and sharpening cards have only editor actions), so the line reads: "Also good to know: noise does not follow ISO on this phone; up to ISO 1000 every ISO band has a median of 32 dB or more."
 - VoiceOver: "The one thing for iPhone 17 Pro Max. Expose for the highlights. 54 of your 206 photos, 26 percent, have more than 1 percent of the frame blown to pure white. Worth acting on. Solid evidence, 206 photos. At the camera."
 
 *iPhone 13:*
 - "**Expose for the highlights.** 23 of your 85 photos (27 %) have more than 1 % of the frame blown to pure white…"
 - Capsule: "Worth acting on · Solid · 85 photos".
-- Next up: "crushed shadows, 35 of 85 photos (41 %)."
+- Next up: "your level edges lean left by 2.1° (26 photos with a long level edge)." Shadows are silent here: 6 of 85 photos (7 %).
 
-*NIKON D850.* Highlights do not fire: 3 of 36 is under the 15 % line.
-- "**Check your shadows.** 12 of your 36 photos (33 %) have more than 1 % of the frame crushed to pure black."
-- Capsule: "Worth acting on · Solid · 36 photos".
-- Action: "In high-contrast light, add +0.3 to +0.7 EV of exposure compensation, or keep the subject out of the darkest areas. If dark areas are the look you want, choose That Is Intended and I will stop putting this first."
+*NIKON D850 (fallback).* No card is eligible. Highlights do not fire: 3 of 36 is under the 15 % line. Shadows do not fire: no photo has more than 1 % crushed to pure black. Only one photo has a long level edge and only one has a sharpness figure, so the level-edge and sharpness rules are silent or Thin.
+- "**No single change stands out.** Your 36 photos rarely clip: 3 have more than 1 % blown to white and none loses its shadows. Sharpness needs scenes with straight edges; water, sky and foliage give the method nothing to measure."
 - "Also good to know: noise falls with ISO the way a sensor's does, and every ISO band you used has a median above 32 dB."
 
-*iPhone XR.* Highlights are Thin here: with 21 photos the 95 % range is 14 to 50 %, which straddles the 15 % line.
-- "**Check your shadows.** 13 of your 21 photos (62 %) have more than 1 % of the frame crushed to pure black."
-- Capsule: "Worth acting on · Solid · 21 photos".
+*iPhone XR (fallback).* Highlights are Thin here: with 21 photos the 95 % range is 14 to 50 %, which straddles the 15 % line. Shadows do not fire (none of 21 photos over 1 %), and the 12 level edges show no lean (median 0.0°).
+- "**No single change stands out yet.** The likeliest candidate, blown highlights, needs more photos: 6 of your 21 have more than 1 % blown to white, and with 21 photos the share could be anywhere from 14 to 50 %."
 - "Needs more photos: blown highlights (6 of 21; with 21 photos the share could be anywhere from 14 to 50 %)."
 
 *SEALIFE DC2000, 5 photos (fallback):* "**No single change stands out yet.** Every finding for this camera rests on fewer than 8 photos, so they are listed under Needs more photos. Add photos from this camera with Choose Photos to Analyze… to get coaching you can act on."
@@ -177,9 +174,9 @@ The full design is in §5.
 - `spokenSummary` appends the evidence sentence.
 - Colour stays paired with the band word, as today.
 
-**Copy (iPhone 17 Pro Max).** Today's screen shows 2,045 LW/PH (Fair) for sharpness, over 85 rows including 42 rows with one or two edges.
+**Copy (iPhone 17 Pro Max).** Today's screen shows 1,604 LW/PH (Fair) for sharpness, over 85 rows including 42 rows with one or two edges.
 
-- **In-focus sharpness.** "2,608 LW/PH · Good". Caption: "From the 43 of 206 photos with 3 or more usable edges; 42 more had only 1 or 2 and are not counted, 121 had none. Read from real edges in your scenes, so it is a lower bound on the lens."
+- **In-focus sharpness.** "1,966 LW/PH · Fair". Caption: "From the 43 of 206 photos with 3 or more usable edges; 42 more had only 1 or 2 and are not counted, 121 had none. Read from real edges in your scenes, so it is a lower bound on the lens."
 - **Noise (SNR).** "34.5 dB · Good". Caption: "167 of 206 photos; 39 left out (17 where mid-grey had to be estimated, 17 with textured flat areas, 5 with a repeating pattern). Compares this phone's processing, not its sensor."
 - **Blown highlights.** "0.47 % · Good (median)". Caption: "Counted pixel by pixel in the file's own encoding. 54 of 206 photos (26 %) lose more than 1 %. 47 photos also hold colour that sRGB cannot show; that is not lost detail."
 - **Sharpening halo.** "10.7 % · Fair". Caption: "Median over the 43 photos with 3 or more usable edges. Above 8 % the phone is sharpening hard, and part of the sharpness figure is that sharpening."
@@ -190,8 +187,8 @@ The full design is in §5.
 - **In-focus sharpness.** "Not enough photos". Caption: "1 of 36 photos had 3 or more usable edges (it measured 2,377 LW/PH); 3 had 1 or 2, and 32 had none. Scenes without straight edges, such as water, sky and foliage, give the method nothing to measure. Photograph something with straight edges, such as a building, a sign or a bookshelf, to get a figure."
 - **Dynamic range.** "At least 8.6 stops". Caption: "Only 1 of 36 photos reached the noise floor (3.9 stops in that frame); the other 35 only set a lower bound. Not comparable with other cameras." Today the tile shows "3.9 stops" from that one row.
 
-**Copy (iPhone XR).** Today: 801 LW/PH, Poor.
-- **In-focus sharpness.** "Not enough photos". Caption: "3 of 21 photos had 3 or more usable edges (median 2,247 LW/PH); 7 more had 1 or 2, and 11 had none. A camera figure needs 5."
+**Copy (iPhone XR).** Today: 601 LW/PH, Poor.
+- **In-focus sharpness.** "Not enough photos". Caption: "3 of 21 photos had 3 or more usable edges (median 1,685 LW/PH); 7 more had 1 or 2, and 11 had none. A camera figure needs 5."
 
 **Caveat it carries.** Per-tile, as written. The sharpness tile's ⓘ popover holds the per-photo band (layer 6). The separate "Read single-photo sharpness loosely" card is removed: it quoted the median-MTF50 interval width (0.61) while every figure on screen is p80 (0.36 wide).
 
@@ -245,32 +242,28 @@ Below the cards come three disclosures:
      - "**How sure.** Solid: 206 photos, and allowing for chance the share is between 21 and 33 %, clear of the 15 % line."
      - "**What it cannot tell.** Whether the white was a sky you wanted, a white page or a screen; the examples show which kind yours are."
      - "**Check it yourself.** Shoot the same bright scene twice, once as it comes and once with the sun slider pulled down, and analyze both."
-2. **Shadows often lose detail.** Worth acting on · Solid · 206 photos.
-   - Finding: "117 of your 206 photos (57 %) have more than 1 % of the frame crushed to pure black."
-   - Why: "Pure black holds no detail. Dark areas are often the look you want; if not, the exposure was set for the bright parts."
-   - At the camera: "In high-contrast scenes, tap the darker subject so the camera exposes for it, or keep important subjects out of the darkest areas."
-   - In the editor: "Lift shadows on the photos you keep; each photo's Shadows step says how, and lifting raises noise."
-3. **The phone smooths grain away.** Worth acting on · Solid · 59 photos.
+2. **The phone smooths grain away.** Worth acting on · Solid · 59 photos.
    - Finding: "Noise smoothing is 0.44 above ISO 160 (median over 59 photos; untouched grain reads 0.14): the phone removes grain by blurring it."
    - Why: "Blurring cannot tell grain from fine texture such as hair, foliage and fabric, so a clean noise figure can hide lost texture. Below ISO 160 this measure is unreliable: the noise is too faint to separate from the scene's own fine detail."
    - In the editor: "Do not add noise reduction to photos that look clean; the phone has already applied it."
    - The current action "Keep ISO low for texture subjects" is removed: the data cannot support it (§8).
-4. **This phone sharpens hard.** Worth acting on · Moderate · 43 photos.
+3. **This phone sharpens hard.** Worth acting on · Moderate · 43 photos.
    - Finding: "Edges overshoot by 10.7 % (median over the 43 photos with 3 or more usable edges), which shows as a bright fringe when enlarged."
    - Why: "Part of the sharpness figure is this sharpening, not the lens."
    - In the editor: "Do not add sharpening." and "Downsize for the web with a soft resampler so the fringes do not double."
    - No at-camera action on phones; the Camera app has no sharpness setting.
-5. **Noise does not follow ISO on this phone.** Good to know · Solid · 167 photos.
+4. **Noise does not follow ISO on this phone.** Good to know · Solid · 167 photos.
    - Finding: "Median noise is 33.6 dB at ISO 64 and below (44 photos), 32.0 dB at ISO 65–160 (71), 36.7 dB at 161–400 (28) and 36.8 dB at 401–1000 (16); above ISO 1000 your 8 photos range from 21.6 to 40.8 dB, too few to say where grain starts."
    - Why: "The phone's noise reduction rises with ISO and holds the output roughly level, so this figure compares its processing, not its sensor; that is why mid-ISO frames read cleaner than base ISO."
    - At the camera: "Do not chase a low ISO for clean pictures on this phone: up to ISO 1000 every ISO band has a median of 32 dB or more."
    - What would change this: "10 or more photos above ISO 1000."
    - Check it yourself: "Photograph the same plain wall in bright light and in dim light and analyze both; the phone will pick different ISOs."
-6. **Your main and ultra-wide cameras resolve the same detail.** Good to know · Moderate · 10 photos.
-   - Finding: "Counting only photos with 3 or more usable edges, the main camera reads 2,608 LW/PH (33 photos) and the ultra-wide 2,532 LW/PH (10 photos): a 3 % gap, inside the measurement band. The telephoto and front cameras have no photo with 3 usable edges, so they are not compared."
+5. **Your main and ultra-wide cameras resolve the same detail.** Good to know · Moderate · 10 photos.
+   - Finding: "Counting only photos with 3 or more usable edges, the ultra-wide reads 2,158 LW/PH (10 photos) and the main camera 1,956 LW/PH (33 photos): a 9 % gap, inside the 15 % measurement band. The telephoto and front cameras have no photo with 3 usable edges, so they are not compared."
    - What would change this: "5 telephoto photos of scenes with straight edges."
-   - Today this card ranks the ultra-wide first at 2,130 and lists the front camera at 1,447; both figures come from one- and two-edge rows.
-7. **Colours lean slightly warm.** Good to know · Moderate · 206 photos.
+   - Today this card ranks the ultra-wide first at 1,778 and lists the front camera at 1,269; both figures include one- and two-edge rows.
+   - With the height-based LW/PH used before 23 Oct the order was reversed (main 2,608, ultra-wide 2,532): portrait frames, most of the main camera's, read 1.33x higher. The short side puts both on one scale.
+6. **Colours lean slightly warm.** Good to know · Moderate · 206 photos.
    - Finding: "Across 206 photos the gray-world balance leans warm: B/G −0.17 stops, R/G +0.04."
    - Why: "Part of any lean is the light you shoot in; a lean that holds across many scenes is the phone's rendering."
    - In the editor: "Where greys should look neutral, use the white-balance picker on something grey or white."
@@ -283,11 +276,12 @@ Below the cards come three disclosures:
   - Try this: "Photograph a bookshelf, a brick wall or a page of text filling the frame, square on, and analyze it."
   - What would change this: "5 photos with straight edges both in the middle and near the corners."
 - **Slow shutter speeds may cost sharpness.** Thin · 1 photo.
-  - "16 of your 206 photos were taken at 1/30 s or slower; only 1 had 3 or more usable edges (1,231 LW/PH, against 2,615 LW/PH over 42 faster photos). One photo cannot show a pattern."
+  - "16 of your 206 photos were taken at 1/30 s or slower; only 1 had 3 or more usable edges (923 LW/PH, against 1,995 LW/PH over 42 faster photos). One photo cannot show a pattern."
   - Try this: "In dim light, take the same scene twice, once hand-held and once braced against a wall, and analyze both."
   - What would change this: "5 slow photos of scenes with straight edges."
 
-**3 checks had nothing to say.**
+**4 checks had nothing to say.**
+- "Crushed shadows: 17 of 206 photos (8 %; between 5 and 13 % allowing for chance) have more than 1 % pure black, under the 15 % line."
 - "Level-edge habit: in the 119 photos with a long level edge, 43 lean left and 42 lean right by a degree or more (median 0.0°), so there is no habit to correct. Each photo's own note still gives its angle."
 - "Shallow depth of field: 25 of 206 photos (12 %) split into a sharp subject and a soft background; this note appears at 30 %."
 - "Aperture: each lens with measurable photos was used at one aperture (main f/1.8, ultra-wide f/2.2), so there is nothing to compare."
@@ -300,8 +294,8 @@ Below the cards come three disclosures:
 
 **Set-aside copy.**
 - The sheet: "This card moves to You set aside and stops being the one thing. It stays counted in the report card. It comes back on its own if the evidence changes: the photo count grows by a quarter, or its severity or evidence word changes."
-- Collapsed card: "Shadows often lose detail · set aside 15 Oct 2026 · 'night street shots' · Bring Back."
-- On return: "Back because the evidence changed: you set this aside at 117 of 206 photos (57 %); it is now {k} of {n} ({p} %)."
+- Collapsed card: "Highlights are often blown out · set aside 15 Oct 2026 · 'snow and beach days' · Bring Back."
+- On return: "Back because the evidence changed: you set this aside at 54 of 206 photos (26 %); it is now {k} of {n} ({p} %)."
 
 **Caveat it carries.** Every card states its counted photos. Edge-based cards say "lower bound". The ISO and noise cards say "processing, not sensor". Level-edge cards say "not always a horizon". Colour cards say "gray-world".
 
@@ -350,7 +344,7 @@ The editor picker (Apple Photos / Lightroom / Any editor) sits at the top of Do 
 - Each advice card has a trailing `Menu` (`ellipsis.circle`) with one matching intent, for example "Dark on Purpose". Choosing it collapses the card to one line with **Show Anyway**.
 - Intent capsules under the title use `Label(tag.word, systemImage: "hand.raised")` and have a remove button.
 - A toolbar button **Copy Editing Steps** exports the steps (§6).
-- `PhotoTable`'s sharpness cell shows "5,025 · 27 edges", or "— · 1 edge" in `.secondary`, which sorts as missing.
+- `PhotoTable`'s sharpness cell shows "3,769 · 27 edges", or "— · 1 edge" in `.secondary`, which sorts as missing.
 
 **Copy.**
 
@@ -361,24 +355,21 @@ Do first:
    - "Adjust > Light: drag Highlights down, then add Brilliance to open the bright areas."
    - Caution: "On a JPEG or HEIC, pixels at pure white hold no detail: this softens the glare but cannot bring detail back."
    - Note: "A further 1.9 % of pixels hold colour sRGB cannot show; that colour is in the file and is not lost detail."
-2. **Crushed shadows.** "1.5 % of the picture is pure black."
-   - "Adjust > Light: drag Shadows up and lower Black Point."
-   - Caution: "Lifting shadows raises noise; this photo measures 41.2 dB (Excellent), so there is room."
+2. **Sharpening halo.** "Edges overshoot by 14.9 %: a visible fringe. Do not add sharpening; leave Adjust > Sharpen off."
 
-Also (3):
-- **Sharpening halo.** "Edges overshoot by 14.9 %: a visible fringe. Do not add sharpening; leave Adjust > Sharpen off."
+Also (2):
 - **Colour lean.** "This picture leans warm by 0.52 stops; your iPhone 17 Pro Max usually leans 0.17, so most of this is the light or the subject. It is a colourful picture (colourfulness 69; your library's median is 39), so the figure may describe the subject's own colour. Correct it only if greys should look neutral."
 - **Level edge.** "A long level edge is 3.8° off level, left end lower. It may be a horizon or a table edge seen at an angle; straighten only if it should be level."
 
-Checked, nothing to do: "Noise 41.2 dB (acts below 30) · Middle tone 102 of 255 (acts below 70 or above 190) · Tonal range 8.3 stops (acts below 7) · Sharpness 0.32 c/px (acts below 0.18) · Subject 0.47 from a thirds point (acts above 0.75) · No repeating pattern."
+Checked, nothing to do: "Crushed shadows 0.04 % (acts above 0.5) · Noise 41.2 dB (acts below 30) · Middle tone 102 of 255 (acts below 70 or above 190) · Tonal range 8.3 stops (acts below 7) · Sharpness 0.32 c/px (acts below 0.18) · Subject 0.47 from a thirds point (acts above 0.75) · No repeating pattern."
 
-Measurements: "In-focus sharpness 2,608 LW/PH · Good · 5 edges · this photo's range 2,444–2,666."
+Measurements: "In-focus sharpness 1,956 LW/PH · Fair · 5 edges · this photo's range 1,833–1,999."
 
 *E07C5F37, the petunia (iPhone 13, ISO 40, 1/193 s, f/1.6).*
-- Overlay caption today: "13.12 % blown". New caption: "Red: pure white in this preview. The file itself has 1.4 % blown; up to 11.7 % more is colour beyond sRGB, which the preview clips and paints red although the file holds it. Blue: crushed shadows (3.1 %)."
-- Do first:
+- Overlay caption today: "13.12 % blown". New caption: "Red: pure white in this preview. The file itself has 1.4 % blown; up to 11.7 % more is colour beyond sRGB, which the preview clips and paints red although the file holds it. No pixel is crushed to pure black."
+- Do first (one step; nothing else is above Thin):
   1. **Blown highlights.** "1.4 % of the picture is pure white." Extra line: "11.7 % of pixels hold colour outside sRGB: keep the original, or export with a Display P3 profile where your app offers one."
-  2. **Crushed shadows.** "3.1 % of the picture is pure black." Caution: "Lifting shadows raises noise; this photo measures 36.2 dB (Good), so there is room."
+- Checked, nothing to do, includes: "Crushed shadows 0.00 % (acts above 0.5) · Noise 36.2 dB (acts below 30)."
 - Also (2):
   - **Colour lean.** "This picture reads warm and magenta by 1.46 stops, far from your iPhone 13's usual rendering. It is a very colourful picture (colourfulness 125; your library's median is 39), so the figure most likely describes the subject's own colour, not the light. Leave white balance alone unless greys look tinted." Menu: "Colour Is the Point".
   - **Composition.** "The detail sits 0.93 from the nearest rule-of-thirds point (1 is the centre). Composition is taste; a centred bloom can be the point."
@@ -387,9 +378,9 @@ Measurements: "In-focus sharpness 2,608 LW/PH · Good · 5 edges · this photo's
 
 *0364AD55 (iPhone 17 Pro Max ultra-wide, ISO 3200, 1/24 s).* Do first, in this order:
 1. **Exposure: dark.** "The middle tone sits at 27 of 255." "Adjust > Light: Exposure up, starting around +0.3 to +0.7." Caution: "Brighten before you judge noise; brightening raises it."
-2. **Crushed shadows.** "2.9 % of the picture is pure black." Caution: "This photo measures 27.2 dB (Fair) and the phone has already smoothed it (0.48), so lift shadows gently."
+2. **Noise.** "This photo measures 27.2 dB (Fair), and the phone has already smoothed it (0.48): add only gentle noise reduction after brightening."
 
-Also: Noise (27.2 dB), and Colour lean ("warm and green by 1.03 stops; your phone usually leans 0.17, so most of this is the light").
+Also: Colour lean ("warm and green by 1.03 stops; your phone usually leans 0.17, so most of this is the light"). Checked includes "Crushed shadows 0.00 % (acts above 0.5)".
 
 *C6220E43 (iPhone 17 Pro Max, ISO 200).*
 - Do first: **Sharpening halo** (12.0 %).
@@ -398,8 +389,8 @@ Also: Noise (27.2 dB), and Colour lean ("warm and green by 1.03 stops; your phon
   - "Vision found no horizon, so it is probably a table, a roof line or a slope; straighten only if it should be level."
 
   Plus Shallow depth of field.
-- Checked: "Blown highlights 0.24 % (acts above 0.5) · Crushed shadows 0.42 % (acts above 0.5) · Noise 41.2 dB · Middle tone 166 · Tonal range 9.9 stops · Colour within 0.15 stops of this camera's usual · Sharpness 0.44 c/px."
-- Sharpness row: "5,025 LW/PH · Excellent · 27 edges · this photo's range 4,776–5,190."
+- Checked: "Blown highlights 0.24 % (acts above 0.5) · Crushed shadows 0.18 % (acts above 0.5) · Noise 41.2 dB · Middle tone 166 · Tonal range 9.9 stops · Colour within 0.15 stops of this camera's usual · Sharpness 0.44 c/px."
+- Sharpness row: "3,769 LW/PH · Excellent · 27 edges · this photo's range 3,582–3,892."
 
 **Caveat it carries.**
 - Every sharpness row shows the photo's own p80 range and edge count. The popover adds the comparison rule: treat two photos as different only past 30 %, because the range covers edge sampling, not the scene (FINDINGS §6).
@@ -430,7 +421,7 @@ Also: Noise (27.2 dB), and Colour lean ("warm and green by 1.03 stops; your phon
 
 **Copy.**
 - **Sharpness, How sure.** "Measured on real edges in your photos with the ISO 12233 slanted-edge method, so every figure is a lower bound that depends on the scene. One photo's figure carries its own range (on this phone typically 36 % of the value wide, from which edges happened to be measured); compare two photos only when they differ by more than 30 %. A camera median over many photos is the figure to trust."
-- **Sharpness, In this camera.** "2,608 LW/PH is the median of 43 photos with 3 or more usable edges; the middle half lies between 1,890 and 3,464."
+- **Sharpness, In this camera.** "1,966 LW/PH is the median of 43 photos with 3 or more usable edges; the middle half lies between 1,489 and 2,680."
 - **Noise, How sure.** "Output-referred: noise reduction and HEIC or JPEG compression lower it as much as the sensor does, so it compares processing across ISO and cameras, not sensors. Photos whose mid-grey had to be estimated, or whose flat areas were textured or held a repeating pattern, are left out."
 - **Dynamic range, How sure.** "Often only a lower bound: the floor can be found only in frames with deep, flat shadows, and a JPEG's tone curve caps it."
 - **Clipping, How sure.** "A direct count of pixels at the top (any channel 254 or above) or bottom (all channels 1 or below), in the file's own encoding: the most certain figure here. It cannot tell a blown sky from a white page."
@@ -443,7 +434,7 @@ Also: Noise (27.2 dB), and Colour lean ("warm and green by 1.03 stops; your phon
 ### Layer 7: Library headline and sparse cameras
 
 **What she sees.**
-- **Library.** The headline is rewritten, the table gains a "One thing" column, and the sharpness cell shows its count ("2,608 LW/PH · Good (43)" or "Not enough photos (1)"). A provenance line names the file and when it was written.
+- **Library.** The headline is rewritten, the table gains a "One thing" column, and the sharpness cell shows its count ("1,966 LW/PH · Fair (43)" or "Not enough photos (1)"). A provenance line names the file and when it was written.
 - **Sparse cameras.** A camera with fewer than 5 photos shows its photos' own figures (not medians), what is missing, the count needed, and a **Choose Photos to Analyze…** button. Its sidebar row sits under "Too few photos".
 
 **Question.** Which camera behaves how, and why do some get no coaching?
@@ -464,8 +455,8 @@ Also: Noise (27.2 dB), and Colour lean ("warm and green by 1.03 stops; your phon
 
 **Copy.**
 - **Headline.** "The NIKON D850's noise follows ISO the way a sensor's does: 42.5 dB at ISO 64 and below, falling to 33.9 dB above ISO 1000. On the iPhone 17 Pro Max, iPhone 13 and iPhone XR it does not fall steadily with ISO, which points to processing: noise figures here compare each camera's processing, not its sensor."
-- **Provenance.** "From results.json, written 15 Oct 2026 at 08:37 · 389 photos from 19 cameras."
-- **iPhone 13 mini (2 photos).** "Coaching starts at 5 photos; this camera has 2, so here are the photos' own figures rather than medians. Noise 28.4 and 42.7 dB. Crushed shadows 1.9 % and 3.0 % (both over the 1 % line). Blown highlights 1.4 % and 0.5 %. No sharpness figure: neither photo had a usable straight edge. Add photos taken with this camera with Choose Photos to Analyze… (⇧⌘P)."
+- **Provenance.** "From results.json, written 23 Oct 2026 at 04:36 · 389 photos from 19 cameras."
+- **iPhone 13 mini (2 photos).** "Coaching starts at 5 photos; this camera has 2, so here are the photos' own figures rather than medians. Noise 28.4 and 42.7 dB. Blown highlights 1.4 % and 0.5 %. Crushed shadows 0.00 % and 0.04 % (both well under the 1 % line). No sharpness figure: neither photo had a usable straight edge. Add photos taken with this camera with Choose Photos to Analyze… (⇧⌘P)."
 - **SEALIFE DC2000.** It has 5 photos, so it gets the normal screen with the layer 1 fallback. It is not shown as sparse; the "coaching starts at 5" sentence never appears on a 5-photo camera.
 
 **Caveat it carries.** The headline itself carries "processing, not sensor". Sparse figures are labelled per photo, never as medians.
@@ -483,7 +474,7 @@ Also: Noise (27.2 dB), and Colour lean ("warm and green by 1.03 stops; your phon
 
 **New computed properties on `PhotoRecord`:**
 - `hasSharpnessFigure` (`edgesMeasured >= 3`).
-- `p80RangeLWPH: ClosedRange<Double>?` (2 × c/px × height).
+- `p80RangeLWPH: ClosedRange<Double>?` (2 × c/px × the short side, min(width, height), the same scale as `mtf50_p80_lwph` since 23 Oct 2026).
 - `p80RelativeWidth`.
 - `rejectReasons: [(EdgeRejectReason, Int)]`. Unknown keys are kept, with their raw name.
 - `key: PhotoKey`.
@@ -761,8 +752,9 @@ No bootstrap is needed. Thresholds are design choices and are printed as such.
 | 54/206 | 1/20 | −21 (−29 to −2) | It worked |
 | 54/206 | 2/20 | −16 (−26 to +5) | Not settled yet |
 | 54/206 | 6/24 | −1 (−16 to +19) | Not settled yet, about the same so far |
-| 117/206 shadows (57 %) | 2/10 | −37 (−53 to −5) | It worked |
-| 117/206 | 6/12 | −7 (−32 to +19) | Not settled yet |
+| 17/206 shadows (8 %; 5–13 %) | 0/10 | −8 (−13 to +20) | Not settled yet |
+| 17/206 | 0/60 | −8 (−13 to −2) | A small drop |
+| 17/206 | 4/12 | +25 (+5 to +53) | Higher than before |
 | 22/26 level edges, iPhone 13 (85 %; 66–94 %) | 2/10 | −65 (−82 to −29) | It worked |
 
 **UI.**
@@ -782,7 +774,7 @@ No bootstrap is needed. Thresholds are design choices and are printed as such.
 - **Not settled yet (0 of 10).** "Not settled yet. Before: 26 % of 206. After: 0 of 10 new photos. That looks better, but with 10 photos the difference could be anywhere from 33 points lower to 2 points higher. Keep going: more photos narrow it."
 - **It worked (1 of 20).** "It worked. Before: 26 % of 206. After: 1 of 20 (5 %). The drop is 21 points; allowing for chance it is somewhere between 2 and 29 points."
 - **About the same (6 of 24).** "Not settled yet, and about the same so far. After: 6 of 24 (25 %) against 26 % before; the difference could be anywhere from 16 points lower to 19 points higher. Look at the six photos below: white pages and screens clip whatever you do."
-- **Shadows, first look.** "It worked, at the first look. Before: 117 of 206 (57 %). After: 2 of 10 (20 %). Allowing for chance the drop is between 5 and 53 points."
+- **A small drop.** "A small drop. Before: 17 of 206 (8 %). After: 0 of 60. Allowing for chance the drop is between 2 and 13 points, under the 10 points I count as a change that worked."
 - **Format caveat.** Shown when the JPEG/HEIC mix differs by more than 30 points. "Before was mostly JPEG copies of unknown origin (181 of 206; 25 HEIC); after is HEIC originals. Clipping is counted the same way in both, but a copy may have been edited before it was saved."
 - **Not comparable.** "Not comparable: these results were written before clipping was measured in each file's own encoding (15 Oct 2026). Re-analyze the photos, then start the check again."
 - **Undated photos.** "2 new photos carry no date and are not counted."
@@ -798,16 +790,16 @@ No bootstrap is needed. Thresholds are design choices and are printed as such.
 
 ```
 # iPhone 17 Pro Max: coaching from IQ Coach
-From results.json, written 15 Oct 2026 08:37 · 206 photos, shot 19 Jun to 12 Oct 2026
+From results.json, written 23 Oct 2026 04:36 · 206 photos, shot 19 Jun to 12 Oct 2026
 
 ## The one thing
 Expose for the highlights. 54 of 206 photos (26 %) have more than 1 % of the frame blown to pure white.
 Worth acting on · Solid · 206 photos · At the camera
 - [ ] On bright scenes, tap the subject and drag the sun slider down before you shoot.
-Next up: crushed shadows, 117 of 206 photos (57 %); often the look.
+Also good to know: noise does not follow ISO on this phone; up to ISO 1000 every band has a median of 32 dB or more.
 
 ## Report card
-- In-focus sharpness: 2,608 LW/PH (Good), from 43 of 206 photos with 3 or more usable edges
+- In-focus sharpness: 1,966 LW/PH (Fair), from 43 of 206 photos with 3 or more usable edges
 - Noise: 34.5 dB (Good), 167 of 206 photos; compares processing, not sensors
 - Blown highlights: 0.47 % median; 54 of 206 photos over 1 %
 - Sharpening halo: 10.7 % (Fair), 43 photos
@@ -835,7 +827,7 @@ Measured by iq-analyzer. One photo's sharpness is a range; camera medians over m
 ```
 iPhone 17 Pro Max · 15 Oct 2026
 1. Bright scenes: tap, drag the sun slider down (26 % of photos blew highlights)
-2. High contrast: keep the subject out of pure black (57 % crushed; skip if it is the look)
+2. Do not chase a low ISO for clean pictures: up to ISO 1000 every band is 32 dB or more
 3. Do not add sharpening or noise reduction in editing (the phone does both)
 From 206 photos.
 ```
@@ -856,7 +848,7 @@ The plan has 12 steps totalling about 20 hours, so two focused days. Every step 
   - A 1-edge row is left out of the medians and the lens median.
   - Reject-reason parsing keeps an unknown key raw.
   - The p80 LW/PH conversion is right.
-  - Real data: 17 Pro Max sharpness 2,608 over 43; iPhone 13 2,429 over 20; XR returns "not enough" (3); D850 dynamic range is "at least 8.6" with 1 exact row; `hasNativeClipping` is true.
+  - Real data: 17 Pro Max sharpness 1,966 over 43; iPhone 13 1,861 over 20; XR returns "not enough" (3); D850 dynamic range is "at least 8.6" with 1 exact row; `hasNativeClipping` is true.
 
 **2. Statistics and the evidence vocabulary (1 h).**
 - Files: `Model/Stats.swift` (`wilson`, `newcombeDifference`), new `Coaching/Evidence.swift` (`EvidenceGrade`, `EvidenceKind`, `Effort`), `Coaching/Insight.swift` (new fields with defaults; `actionTexts`).
@@ -888,7 +880,7 @@ The plan has 12 steps totalling about 20 hours, so two focused days. Every step 
   - Highlights beat shadows at equal grade.
   - A Thin card is never the one thing.
   - A set-aside card is skipped.
-  - Real data: 17 Pro Max gives `highlight-discipline` with next up `shadow-discipline`; D850 gives `shadow-discipline`; XR gives `shadow-discipline`; SEALIFE gives the fallback.
+  - Real data: 17 Pro Max gives `highlight-discipline` with no eligible next up (the "Also good to know" line names `noise-by-iso`); iPhone 13 gives `highlight-discipline` with next up `level-edge-lean`; D850 gives the fallback; XR gives the fallback (highlights Thin); no camera fires `shadow-discipline`; SEALIFE gives the fallback.
   - The headline names the D850 as following ISO and the three iPhones as not.
 
 **5. Editing rules (1.5 h).**
@@ -943,7 +935,7 @@ The plan has 12 steps totalling about 20 hours, so two focused days. Every step 
 - Files: `Support/MarkdownExport.swift` (the three outputs); new `ExportTests.swift` (the full export begins with the one thing and ends with the provenance footer; the pocket card has five lines or fewer; editing steps follow edit order).
 - Re-render snapshots into a fresh directory and delete `/tmp/iqcoach-snaps5`.
 - Pre-ship eye checks:
-  - Five 17 Pro Max frames among the 117 crushed-shadow photos.
+  - Five 17 Pro Max frames among the 17 crushed-shadow photos.
   - Ten photos at colourfulness ≥ 60.
   - Vision's horizon sign mapping on a real photo.
   - The iOS paths in the vocabulary table, on the phone.

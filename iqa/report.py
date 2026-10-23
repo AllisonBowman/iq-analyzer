@@ -9,11 +9,22 @@ from datetime import datetime
 
 import numpy as np
 
+from .noise import PERIODIC_PEAK_THRESHOLD, WHITENESS_HEAVY, WHITENESS_SMOOTHED
+
+# How each rejection reason in ``edges_reject_reasons`` reads in the report.
+REJECT_REASON_LABELS = {
+    "plateau_noise": "plateau too noisy", "error": "SFR failed", "clipped": "clipped",
+    "contrast_gt_1": "contrast > 1", "no_mtf50_below_nyquist": "no MTF50 below Nyquist",
+    "step_too_small": "step too small", "fit_residual": "edge not straight (fit residual)",
+    "shading": "shaded", "rise_width": "rise too wide", "not_a_step": "not a step",
+    "slant": "slant out of range", "out_of_frame": "out of frame",
+}
+
 CSV_COLUMNS = [
     "file", "format", "is_raw", "camera_make", "camera_model", "lens", "iso", "exposure_s", "f_number",
     "focal_mm", "datetime", "width", "height",
     "color_profile",
-    "edges_candidates", "edges_measured", "edges_rejected", "edges_reject_reasons",
+    "edges_candidates", "edges_measured", "edges_rejected", "edges_unexamined", "edges_reject_reasons",
     "mtf50_median_cpp", "mtf50_median_ci_lo_cpp", "mtf50_median_ci_hi_cpp",
     "mtf50_p80_cpp", "mtf50_p80_ci_lo_cpp", "mtf50_p80_ci_hi_cpp", "mtf50_max_cpp", "mtf50p_median_cpp", "mtf50_p80_lwph",
     "mtf50_v_median_cpp", "mtf50_h_median_cpp", "mtf50_center_median_cpp", "mtf50_outer_median_cpp",
@@ -221,19 +232,23 @@ def write_charts(records: list[dict], out_dir: str) -> list[str]:
         if data:
             ax.boxplot(data, tick_labels=labels, showfliers=True)
             ax.set_ylabel("in-focus MTF50, line widths / picture height")
-            ax.set_title("Resolution by camera (LW/PH is comparable across sensor sizes; cycles/px is not)")
+            ax.set_title("Resolution by camera, LW/PH on the short side\n(comparable across sensor sizes and orientations; cycles/px is not)", fontsize=10)
             ax.grid(True, axis="y", alpha=0.3)
             fig.tight_layout(); p = os.path.join(out_dir, "lwph_by_camera.png"); fig.savefig(p, dpi=130); plt.close(fig); made.append(p)
 
     # Noise curves overlay: luminance noise vs. level for every image (a camera's "noise profile").
-    curves = [(r["file"], r["_noise"]) for r in records if r.get("_noise") is not None and r["_noise"].bin_centers.size >= 3]
+    # Frames flagged as periodic texture or extreme NR are left out: their curve is not noise.
+    curves = [(r["file"], r["_noise"]) for r in records
+              if r.get("_noise") is not None and r["_noise"].bin_centers.size >= 3
+              and not r.get("noise_texture_suspect") and not r.get("noise_periodic_suspect")]
     if curves:
         fig, ax = plt.subplots(figsize=(7, 4.2))
-        for name, nz in curves[:60]:
-            ax.plot(nz.bin_centers, nz.luma_noise, "-", alpha=0.35, lw=1)
+        for name, nz in curves:
+            ax.plot(nz.bin_centers, nz.luma_noise, "-", color="C0", alpha=0.12, lw=0.8)
         ax.set_xlabel("mean luminance (8-bit)")
         ax.set_ylabel("luma noise (8-bit std)")
-        ax.set_title("noise vs. signal level, one line per image")
+        ax.set_title(f"noise vs. signal level, one line per image: {len(curves)} of {len(records)} images\n"
+                     "(frames flagged as periodic texture or extreme NR left out)", fontsize=10)
         ax.grid(True, alpha=0.3)
         fig.tight_layout()
         p = os.path.join(out_dir, "noise_curves.png")
@@ -284,9 +299,27 @@ def write_markdown(records: list[dict], charts: list[str], path: str, title: str
     n_no_noise = sum(1 for r in records if not r.get("noise_patches"))
     n_sharp = sum(1 for r in records if _sharp_ok(r))
     rej = [r for r in records if r.get("edges_rejected")]
+    reason_totals: dict[str, int] = {}
+    for r in records:
+        for part in str(r.get("edges_reject_reasons") or "").split(";"):
+            if "=" in part:
+                k, v = part.split("=", 1)
+                reason_totals[k] = reason_totals.get(k, 0) + int(v)
+    reason_text = ", ".join(f"{REJECT_REASON_LABELS.get(k, k.replace('_', ' '))} {v:,}"
+                            for k, v in sorted(reason_totals.items(), key=lambda kv: -kv[1]))
+    n_unexamined = sum(int(r.get("edges_unexamined") or 0) for r in records)
+    n_unrecorded = sum(max(0, int(r.get("edges_candidates") or 0) - int(r.get("edges_measured") or 0)
+                           - int(r.get("edges_rejected") or 0) - int(r.get("edges_unexamined") or 0))
+                       for r in records)
+    edge_tail = ""
+    if n_unexamined:
+        edge_tail += f" {n_unexamined} further candidates were not examined because the image had already given its maximum number of edges."
+    if n_unrecorded:
+        edge_tail += (f" {n_unrecorded} candidates have no recorded outcome: results written before 2026-10-23 did not count"
+                      " candidates whose ROI fell outside the frame or that were left once the edge cap was reached.")
     lines += ["## What was and was not measurable", "",
               f"- Sharpness: usable slanted edges in **{len(with_edges)} of {n}** images, and **{n_sharp}** had the three or more edges needed for a per-image figure (the medians and rankings use only those). Images without edges (open water, sky, bokeh) have no sharpness figure; "
-              f"{sum(r.get('edges_rejected', 0) for r in rej)} candidate edges across {len(rej)} images were rejected as clipped, shaded, too noisy, too small a step, or not a step at all (counts per image in the CSV).",
+              f"{sum(r.get('edges_rejected', 0) for r in rej)} candidate edges across {len(rej)} images were rejected ({reason_text}; counts per image in the CSV).{edge_tail}",
               f"- Noise: **{n - n_extrap - n_no_noise - n_tex} of {n}** images had flat patches near mid-grey with noise that looks like noise; {n_extrap} report the nearest level instead, {n_tex} are flagged as periodic texture or extreme noise reduction (screens, fabric; {n_per} of them by the spectral detector), and both groups are excluded from the SNR medians and charts; {n_no_noise} had no usable patches.",
               f"- Dynamic range: the noise floor was reached in **{n - n_dr_lb} of {n}** images; the other {n_dr_lb} contained no shadows dark enough and give only a lower bound, which is excluded from the DR medians.",
               ""]
@@ -328,9 +361,9 @@ def write_markdown(records: list[dict], charts: list[str], path: str, title: str
               "- **In-focus sharpness (p80)** assumes at least a fifth of the measured edges are in the plane of focus; on a shallow-depth-of-field frame with few in-focus edges it reports the background. Check `edges_measured` and `mtf50_max_cpp`. `mtf50_*_ci_lo/hi_cpp` are 95 % percentile-bootstrap intervals over the measured edges: how far the figure would move with a different handful of edges from the same frame. With few edges they are wide and reach the sample's extremes; they do not include the scene-dependent bias of natural edges.",
               "- **Structure** columns describe the frame, not its quality: `structure_focus_fraction` is the share of a 4x6 grid holding at least half the frame's peak fine detail (small = a subject against a smooth or blurred field), `structure_focus_cx/cy` is where that detail sits (0-1), `structure_thirds_distance` its distance from the nearest rule-of-thirds point (0 on the point, 1 at the frame centre), the `structure_orient_*` shares say whether strong gradients run horizontally, vertically or diagonally, `structure_horizon_tilt_deg` is the tilt of the longest near-level edge when one exists (a horizon, a table, a shelf; positive = right end lower), and the flat/texture/edge shares say what the surface is made of. `mtf50_infocus_cpp` / `mtf50_background_cpp` appear when the measured edges split cleanly into a sharp and a soft group (a shallow-depth-of-field frame), with `infocus_edge_share` the sharp share; the p80 figure should then be read as the in-focus value.",
               "- **Overshoot** is how far the edge profile overshoots its bright plateau, in % of the step: a direct measure of sharpening halo. MTF50P (relative to the MTF peak) is the sharpening-robust companion of MTF50.",
-              "- **SNR at mid-grey** is 20·log10(118 / noise std) on the 8-bit luminance of flat patches; 35+ dB is clean, below 25 dB is visibly noisy. 8-bit quantisation alone caps it at about 52 dB. The figure is output-referred: noise reduction and JPEG/HEIC compression lower it as much as the sensor does, so SNR-vs-ISO across formats is partly a chart of processing. `noise_whiteness` near 0.14 means white noise; 0.3+ means the noise has been smoothed by NR or compression. `noise_spectral_peak` is how far the strongest frequency in the averaged patch spectrum stands above its surroundings: about 1 for noise, above 8 (`noise_periodic_suspect`) the flat patches contain a repeating pattern (a screen's pixel grid, a weave, halftone) at `noise_periodic_freq_cpp` cycles per pixel, and the SNR is of the pattern, not the sensor.",
+              "- **SNR at mid-grey** is 20·log10(118 / noise std) on the 8-bit luminance of flat patches; 35+ dB is clean, below 25 dB is visibly noisy. 8-bit quantisation alone caps it at about 52 dB. The figure is output-referred: noise reduction and JPEG/HEIC compression lower it as much as the sensor does, so SNR-vs-ISO across formats is partly a chart of processing. `noise_whiteness` near 0.14 means white noise; " + f"{WHITENESS_SMOOTHED:g}+ means the noise has been smoothed by NR or compression, {WHITENESS_HEAVY:g}+ heavily (at very low noise, fine texture and compression raise it too). `noise_spectral_peak` is how far the strongest frequency in the averaged patch spectrum stands above its surroundings: about 1 for noise, above {PERIODIC_PEAK_THRESHOLD:g} (`noise_periodic_suspect`) the flat patches contain a repeating pattern (a screen's pixel grid, a weave, halftone) at `noise_periodic_freq_cpp` cycles per pixel, and the SNR is of the pattern, not the sensor.",
               "- **Dynamic range** is output-referred: the stops between near-white and the darkest level whose scene-linear SNR still exceeds the threshold. A JPEG's tone curve bounds it, and the floor can only be found in frames that contain near-black flat areas; 'lower bound' rows are excluded from the medians.",
-              "- **Clipping** is the share of pixels at the top (any channel >= 254) or bottom (all channels <= 1) of the range, measured in the file's own encoding before any profile conversion. `clip_gamut_pct` is the extra share that saturates only after converting Display P3 or Adobe RGB to sRGB: colour outside the sRGB gamut, not lost detail.",
+              "- **Clipping** is the share of pixels at the top (any channel >= 254) or bottom (all channels <= 1) of the range, measured in the file's own encoding before any profile conversion. `clip_gamut_pct` is the extra share that saturates only after converting Display P3 or Adobe RGB to sRGB, counted on the same pixels (0 when the file needed no conversion): colour outside the sRGB gamut, not lost detail.",
               "- **White balance** is the gray-world ratio of linear channel means (and in stops); it describes the scene's cast as rendered, which for sunsets and underwater work is intent, not error.",
               ""]
     with open(path, "w") as fh:

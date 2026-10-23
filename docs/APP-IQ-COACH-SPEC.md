@@ -47,7 +47,9 @@ meaning, a scale that says what good looks like, and the number.
 - `Metric` enum with `displayName`, `shortMeaning`, `definition` (the deck's glossary wording),
   `unit`, `scale: ClosedRange<Double>`, `goodDirection`, and `band(for:)` → .poor/.fair/.good/.excellent
   with these thresholds:
-  - sharpness p80 (LW/PH): poor < 1500, fair < 2500, good < 3500, excellent ≥ 3500
+  - sharpness p80 (LW/PH): poor < 1500, fair < 2500, good < 3500, excellent ≥ 3500. Since 2026-10-23
+    `mtf50_p80_lwph` uses the short side (FINDINGS §9); these bands were set on the earlier height-based
+    figures, which read 1.33x higher on portrait frames, so they are due a re-check.
   - sharpness p80 (c/px): poor < 0.12, fair < 0.20, good < 0.30, excellent ≥ 0.30
   - SNR mid-grey (dB): poor < 25, fair < 32, good < 38, excellent ≥ 38
   - highlight clipping (%): excellent < 0.1, good < 0.5, fair < 2, poor ≥ 2 (lower is better)

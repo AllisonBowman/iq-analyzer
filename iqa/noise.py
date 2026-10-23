@@ -15,7 +15,9 @@ Method
    acceptance threshold adapts to the image: patches are kept when their
    ratio is below ``max(texture_ratio, 1.3 x the 25th percentile of all
    candidate ratios)``.  The 25th-percentile ratio is reported as
-   ``noise_whiteness`` (0.14 = white; 0.4+ = heavily correlated / NR'd).
+   ``noise_whiteness`` (0.14 = white; ``WHITENESS_SMOOTHED`` = 0.3 and up = smoothed by NR or
+   compression; ``WHITENESS_HEAVY`` = 0.4 and up = heavily correlated / NR'd; at low noise, texture
+   and compression raise it too).
 3b. Periodic texture (screens, fabric, printed halftone) has an amplitude
    comparable to the noise and a *white-looking* residual, so the ratio gate
    misses it.  The power spectrum of every candidate patch is normalised to
@@ -35,9 +37,12 @@ Method
    had mis-scored at 8-12) reach 1.0-3.2; a noise-strength grid on 11 % of
    the frame reaches 16, a half-noise-amplitude sinusoid 15-48, and the
    library's screen photos 11-127.  Above
-   ``PERIODIC_PEAK_THRESHOLD`` (6, the geometric midpoint of 3.2 and 11.3)
-   the image is ``noise_periodic_suspect``,
-   and candidate patches whose own power in the peak's 3x3 bins exceeds four
+   ``PERIODIC_PEAK_THRESHOLD`` (6, the geometric midpoint of 3.2 and 11.3 on that 34-file
+   development sample) the image is ``noise_periodic_suspect``.  The full 389-image library run
+   leaves a narrower gap: unflagged files reach 5.5 and the lowest flagged frames (a striped
+   vehicle) 8.3, so the threshold sits 1.08x above the highest negative and 1.4x below the lowest
+   positive there, not 1.9x each side (results/FINDINGS.md section 5, item 1).  When flagged,
+   candidate patches whose own power in the peak's 3x3 bins exceeds four
    times their local baseline are excluded before the noise floor is taken,
    provided they are a minority of the selected patches
    (``noise_periodic_fraction`` is the share of candidates flagged); when most
@@ -71,6 +76,8 @@ from .imageio import srgb_decode
 
 MIDGREY_8BIT = 118.0   # sRGB encoding of 18 % reflectance
 PERIODIC_PEAK_THRESHOLD = 6.0   # see module docstring, step 3b, for the measured distributions
+WHITENESS_SMOOTHED = 0.3        # descriptive only (no gate uses them): at or above, the noise has been smoothed
+WHITENESS_HEAVY = 0.4           # at or above, heavily smoothed (the IQ Coach app uses the same two lines)
 PERIODIC_MIN_RADIUS = 3.0       # cycles per patch; below this the sigma-8 high-pass still shapes the spectrum
 PERIODIC_PATCH_FACTOR = 4.0     # per-patch exclusion: 3x3 peak power vs local baseline (Gamma(9) tail ~1e-6)
 PERIODIC_MAX_EXCLUDED_FRACTION = 0.5   # exclude flagged patches only while they are a minority of the selected set

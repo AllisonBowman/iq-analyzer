@@ -15,7 +15,7 @@ clear method notes with the ISO reference, and validation against ground truth o
 
 ## State of the project (as of 2026-10-15 09:30 ET)
 
-Done and validated (102 tests pass: `python3 -m pytest -q`):
+Done and validated (116 tests pass: `python3 -m pytest -q`):
 - **A first adversarial review ran on this Mac** (`claude -p` with REVIEW_PROMPT.md, output in
   `REVIEW.md`, 12 min). It found 13 correctness issues and 13 methodology caveats. Fixed the same
   night, each pinned by a test in `tests/test_adversarial.py`: clipped plateaus now rejected
@@ -51,8 +51,9 @@ Done and validated (102 tests pass: `python3 -m pytest -q`):
 - `results_demo/` is the synthetic end-to-end run with ground truth printed by `iqa demo`.
 
 Not done yet:
-- **Real-photo run done (2026-10-13 08:48 ET):** all 389 camera captures in the Photos library
-  (`captures.txt`, built by `python -m iqa.select_captures photo_list.txt captures.txt`), 19 devices,
+- **Real-photo run done (2026-10-13 08:48 ET):** the 389 camera captures whose originals were stored
+  locally on 2026-10-13 (1,035 local files; the iCloud library holds about 54,000 camera captures, so
+  the per-camera samples are whatever Photos had cached, not random samples) (`captures.txt`, built by `python -m iqa.select_captures photo_list.txt captures.txt`), 19 devices,
   578 s, 0 failures. Outputs in `results/` (report.md, results.csv, charts/, FINDINGS.md). The eye
   check of five frames led to three new validity gates (not_a_step, noise_texture_suspect, three-edge
   minimum). Read `results/FINDINGS.md` before touching the metrics: it lists what is and is not
@@ -87,7 +88,10 @@ Not done yet:
 
 ## Allison's to-do
 
-1. **Watch `media/build/iq-analyzer-explainer.mp4`** (12 min 51 s; rebuild with `python media/figures.py && python media/make_explainer.py`).
+1. **Watch `media/build/iq-analyzer-explainer.mp4`** (13 min 32 s; rebuild with `python media/figures.py && python media/make_explainer.py`).
+   It reflects the state of 2026-10-13: its test count (73) and its "what is next" slide (chart mode,
+   the bootstrap interval) are out of date, and some numbers it quotes were corrected on 2026-10-23
+   (`docs/DISCREPANCIES.md`, `results/FINDINGS.md` section 9).
 2. **Watch the step-by-step slide show**, the Claude artifact "How iq-analyzer Reads a Photo"
    (https://claude.ai/artifact/8hdZn1g3j6eu2sSGzn7Uce): 20 slides, one real photo through every stage,
    every term defined.
@@ -98,13 +102,16 @@ Not done yet:
 The morning run, the periodic-texture detector, `--no-paths` (the repo is public) and chart mode
 (ColorChecker dE00 + WB, e-SFR field map; synthetic validation only) are done, 2026-10-13.
 The bootstrap interval (her task 4) is done too; results.csv carries it. **IQ Coach**, the macOS
-coaching app, is built under `mac/IQCoach/` (spec `docs/APP-IQ-COACH-SPEC.md`; 43 Swift tests;
+coaching app, is built under `mac/IQCoach/` (spec `docs/APP-IQ-COACH-SPEC.md`; 77 Swift tests as of 2026-10-23;
 `--snapshot` renders screens headless; `--window-shots` captures the live window but needs an awake
 display; `--open <results.json>` loads a file at launch). The app also identifies picture contents
-on-device with Apple's Vision framework (labels, faces, text, horizon, salient subject; 60 Swift
-tests, one runs Vision on a real file) and shows the structure fields with a focus-map grid. Photos
-come in through the system picker (up to 20) or `--analyze-photos N`. Not yet exercised live by a
-session: the pickers, Table sorting, the Vision section in the running window. Next: shoot a real
+on-device with Apple's Vision framework (labels, faces, text, horizon, salient subject;
+one Swift test runs Vision on a real file) and shows the structure fields with a focus-map grid. Photos
+come in through the system picker (up to 20) or `--analyze-photos N`. The system picker has run end to
+end on 7 photos (two runs on 2026-10-15, `~/Library/Application Support/IQCoach/runs/20261015T043404`
+and `20261015T053032`); the two copies checked against the PhotoKit export (IMG_0448, IMG_0453) are
+byte-identical. Not yet exercised
+live by a session: Table sorting, the Vision section in the running window. Next: shoot a real
 ColorChecker and e-SFR chart (`docs/CHART-SHOOT-HANDOFF.md`) to validate chart mode on a print; then the open review items (a
 two-cluster split for shallow-DOF frames; matched RAW/HEIC pairs). The step-by-step slide show
 lives at the Claude artifact "How iq-analyzer Reads a Photo" (figures from `media/deck_figures.py`). MORNING_PROMPT.md is kept for reference / re-runs. `media/make_explainer.py`

@@ -21,13 +21,20 @@ def analyze_loaded(img: LoadedImage, max_rois: int = 30) -> dict:
         rec[k] = img.meta.get(k)
     edges = measure_natural_edges(img.lin_luma, max_rois=max_rois)
     rec.update(edges.as_dict())
-    rec["mtf50_p80_lwph"] = lw_per_ph(edges.mtf50_p80, img.height) if edges.n_measured else float("nan")
+    # LW/PH uses the picture height in landscape orientation (the short side), so a portrait frame
+    # and a landscape frame from the same camera are on one scale.
+    rec["mtf50_p80_lwph"] = (lw_per_ph(edges.mtf50_p80, min(img.lin_luma.shape[:2]))
+                             if edges.n_measured else float("nan"))
     noise = analyze_noise(img.rgb8)
     rec.update(noise.as_dict())
     exposure = analyze_exposure(img.rgb8).as_dict()
     if img.meta.get("native_clip_high_pct") is not None:
-        # Report clipping as the file encodes it; the sRGB-measured excess is gamut clipping.
-        exposure["clip_gamut_pct"] = max(0.0, exposure["clip_high_pct"] - img.meta["native_clip_high_pct"])
+        # Report clipping as the file encodes it. Gamut clipping is the excess after a profile
+        # conversion, counted on the same full-resolution pixels (analyze_exposure subsamples, so its
+        # count cannot be differenced against the native one); zero when nothing was converted.
+        srgb_high = img.meta.get("srgb_clip_high_pct")
+        exposure["clip_gamut_pct"] = (max(0.0, srgb_high - img.meta["native_clip_high_pct"])
+                                      if srgb_high is not None else 0.0)
         exposure["clip_high_pct"] = img.meta["native_clip_high_pct"]
         exposure["clip_low_pct"] = img.meta["native_clip_low_pct"]
     else:

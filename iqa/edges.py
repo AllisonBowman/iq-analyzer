@@ -55,6 +55,7 @@ class EdgeSummary:
     n_center: int = 0
     n_outer: int = 0
     n_rejected: int = 0
+    n_unexamined: int = 0        # candidates left once max_rois edges were measured
     reject_reasons: dict = field(default_factory=dict)
     edges: list[EdgeMeasurement] = field(default_factory=list)
 
@@ -80,6 +81,7 @@ class EdgeSummary:
             "edges_center": self.n_center,
             "edges_outer": self.n_outer,
             "edges_rejected": self.n_rejected,
+            "edges_unexamined": self.n_unexamined,
             "edges_reject_reasons": ";".join(f"{k}={v}" for k, v in sorted(self.reject_reasons.items())),
         }
 
@@ -154,6 +156,7 @@ def measure_natural_edges(lin_luma: np.ndarray, max_rois: int = 30, roi_len: int
         else:
             x0, y0, rw, rh = int(cx - L / 2), int(cy - A / 2), L, A
         if x0 < 0 or y0 < 0 or x0 + rw > w or y0 + rh > h:
+            reasons["out_of_frame"] = reasons.get("out_of_frame", 0) + 1
             continue
         roi = lin_luma[y0:y0 + rh, x0:x0 + rw].astype(np.float64)
         if orient == "h":
@@ -193,8 +196,10 @@ def measure_natural_edges(lin_luma: np.ndarray, max_rois: int = 30, roi_len: int
         if len(measured) >= max_rois:
             break
 
+    n_rejected = int(sum(reasons.values()))
     summ = EdgeSummary(n_candidates=len(cands), n_measured=len(measured), edges=measured,
-                       n_rejected=int(sum(reasons.values())), reject_reasons=reasons)
+                       n_rejected=n_rejected, reject_reasons=reasons,
+                       n_unexamined=len(cands) - len(measured) - n_rejected)
     if measured:
         m50 = np.array([e.sfr.mtf50 for e in measured])
         summ.mtf50_median = float(np.median(m50))
@@ -223,5 +228,8 @@ def measure_natural_edges(lin_luma: np.ndarray, max_rois: int = 30, roi_len: int
 
 
 def lw_per_ph(mtf50_cpp: float, height_px: int) -> float:
-    """Imatest-style line widths per picture height: 2 x MTF50 (c/px) x height."""
+    """Imatest-style line widths per picture height: 2 x MTF50 (c/px) x height.
+
+    Pass the picture height in landscape orientation (the short side); iqa.analyze does.
+    """
     return float(2.0 * mtf50_cpp * height_px)

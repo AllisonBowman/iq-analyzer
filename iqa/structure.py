@@ -154,10 +154,15 @@ def analyze_structure(rgb8: np.ndarray, grid: tuple[int, int] = GRID) -> Structu
         s = hp[:nb_r * B, :nb_c * B].reshape(nb_r, B, nb_c, B).std(axis=(1, 3))
         is_edge = e > 0.02
         is_tex = ~is_edge & (s > 4.0)
-        res.edge_share = float(is_edge.mean())
-        res.texture_share = float(is_tex.mean())
-        res.flat_share = float(1.0 - res.edge_share - res.texture_share)
+        res.flat_share, res.texture_share, res.edge_share = surface_shares(is_edge, is_tex)
     return res
+
+
+def surface_shares(is_edge: np.ndarray, is_tex: np.ndarray) -> tuple[float, float, float]:
+    """(flat, texture, edge) shares of the blocks, each the mean of its own mask so none can go
+    negative (1 - edge - texture is -5.6e-17 for 4 edge blocks and 1 texture block)."""
+    is_flat = ~is_edge & ~is_tex
+    return float(is_flat.mean()), float(is_tex.mean()), float(is_edge.mean())
 
 
 def focus_split(mtf50: np.ndarray, min_n: int = 5) -> dict | None:

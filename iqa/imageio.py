@@ -33,8 +33,11 @@ except Exception:  # pragma: no cover
 
 RAW_EXT = {".cr2", ".cr3", ".nef", ".nrw", ".arw", ".srf", ".sr2", ".dng", ".raf",
            ".orf", ".rw2", ".pef", ".3fr", ".iiq", ".erf", ".mos", ".x3f"}
-PIL_EXT = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp", ".heic", ".heif", ".gif"}
+PIL_EXT = {".jpg", ".jpeg", ".jpe", ".png", ".tif", ".tiff", ".bmp", ".webp", ".heic", ".heif", ".gif"}
 IMAGE_EXT = RAW_EXT | PIL_EXT
+# The format column names the container, not the spelling of the extension: Photos stores
+# UUID.jpeg while a PhotoKit export keeps IMG_0001.JPG, and the two must not read as two formats.
+FORMAT_ALIASES = {"jpg": "jpeg", "jpe": "jpeg", "tif": "tiff", "heif": "heic"}
 
 logging.getLogger("exifread").setLevel(logging.ERROR)
 
@@ -200,7 +203,8 @@ def load_image(path: str, max_side: int | None = None) -> LoadedImage:
     Downsampling changes measured sharpness; leave it unset for SFR work.
     """
     ext = os.path.splitext(path)[1].lower()
-    meta: dict = {"format": ext.lstrip(".")}
+    fmt = ext.lstrip(".")
+    meta: dict = {"format": FORMAT_ALIASES.get(fmt, fmt)}
     if ext in RAW_EXT:
         if not HAVE_RAWPY:
             raise RuntimeError("rawpy is not installed; cannot read RAW files")
@@ -225,6 +229,10 @@ def load_image(path: str, max_side: int | None = None) -> LoadedImage:
         meta["native_clip_high_pct"], meta["native_clip_low_pct"] = native_clip_stats(np.asarray(im, dtype=np.uint8))
         im, meta["color_profile"] = _to_srgb(im)
         rgb8 = np.asarray(im, dtype=np.uint8)
+        if meta["color_profile"].endswith("-> sRGB"):
+            # The same full-resolution pixels after conversion: the excess over the native count is
+            # colour that only sRGB clips (``clip_gamut_pct``), with no sampling difference in it.
+            meta["srgb_clip_high_pct"] = native_clip_stats(rgb8)[0]
         rgb8 = _downscale(rgb8, max_side)
         lin = srgb_decode(rgb8.astype(np.float32) / 255.0)
         if not meta.get("camera_model"):

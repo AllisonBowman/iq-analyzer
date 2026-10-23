@@ -6,19 +6,19 @@ with CSV/JSON output, charts and a markdown report. Reads RAW (CR2/NEF/ARW/DNG/R
 JPEG, HEIC, PNG and TIFF.
 
 Built to be checked, not just plausible: every measurement is validated against synthetic
-images with known ground truth (`tests/`, 102 tests), `iqa demo` reproduces that check end to
+images with known ground truth (`tests/`, 116 tests), `iqa demo` reproduces that check end to
 end, and the tool reports what it could *not* measure (clipped or shaded edges, extrapolated
 noise levels, dynamic-range lower bounds) instead of printing a number anyway. A first
-adversarial review by a separate Claude Code session (`REVIEW.md`) found 13 issues; the
-correctness ones are fixed and pinned by `tests/test_adversarial.py`, the methodology caveats
-are stated in the report's "How to read these numbers".
+adversarial review by a separate Claude Code session (`REVIEW.md`) found 13 correctness issues
+and 13 methodology caveats; the correctness issues are fixed and pinned by `tests/test_adversarial.py`,
+the methodology caveats are stated in the report's "How to read these numbers".
 
 ## Quick start
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python -m pytest -q                      # 102 tests: SFR vs analytic MTF (with pixel aperture), noise vs injected sigma, CIEDE2000 vs the published pairs, synthetic charts, adversarial cases
+python -m pytest -q                      # 116 tests: SFR vs analytic MTF (with pixel aperture), noise vs injected sigma, CIEDE2000 vs the published pairs, synthetic charts, adversarial cases
 python -m iqa demo --out results_demo    # synthetic scenes with known blur/noise, analysed end to end
 python -m iqa analyze ~/Pictures/export --out results --sample 60 -r
 open results/report.md
@@ -48,7 +48,7 @@ python -m iqa chart chart_shot.heic --plot chart.png --json chart.json
 | Clipping, tonal range, colorfulness, gray-world WB (linear, in stops), saturation | histogram statistics (`iqa/exposure.py`) | synthetic clipped blocks counted correctly |
 | Periodic texture in the noise patches (screens, weaves, halftone) | averaged unit-power patch spectra, annular then directional baseline, peak > 6 flags the image and excludes the patches when they are a minority (`iqa/noise.py`) | white / pink / smoothed / anisotropic / JPEG-blocked noise not flagged; a 4-px grid at noise amplitude, a half-amplitude slanted weave and a screen on 11 % of the frame flagged with the frequency recovered within one bin |
 | Colour accuracy on a ColorChecker Classic: CIEDE2000 per patch, mean / max / chromatic / neutral, white-balance error in stops | OpenCV's ColorChecker detector plus a patch-centroid homography refit; sRGB -> XYZ -> Bradford D50 -> L*a*b* against the chart's reference values (`iqa/color.py`) | CIEDE2000 reproduces all 34 published Sharma-Wu-Dalal test pairs to 1e-4; a rendered chart through perspective, blur, noise and JPEG: centres within 4 px, dE00 < 1 on every in-gamut patch (cyan is outside sRGB); a 0.3-stop red gain in linear light reads as +0.30 stops |
-| Sharpness across the field on an e-SFR chart: per-square MTF50, centre vs outer, radial vs tangential | Otsu + contour squares with a 2-15 degree slant; all four sides measured with the same e-SFR code (`iqa/chart_sfr.py`) | a rendered 5x5 chart with a known Gaussian blur: all 25 squares and 100 edges found, every edge within 6 % of the analytic MTF50; a field-dependent blur reproduces each square's own blur within 8 % and orders centre before corners |
+| Sharpness across the field on an e-SFR chart: per-square MTF50, centre vs outer, radial vs tangential | Otsu + contour squares with a 2-15 degree slant; all four sides measured with the same e-SFR code (`iqa/chart_sfr.py`) | a rendered 5x4 chart with a known Gaussian blur: all 20 squares and at least 76 of the 80 edges found, every edge within 6 % of the analytic MTF50; a 5x5 chart with blur growing towards the corners reproduces each square's own blur (mean of its edges) within 8 % and orders centre before corners |
 | Colour management | embedded ICC profiles (Display P3 iPhone HEICs, Adobe RGB JPEGs) are converted to sRGB before any measurement (`iqa/imageio.py`) | sRGB-tagged and untagged paths tested; P3 conversion to be confirmed on the real HEIC run |
 
 Limits worth knowing: natural edges are not chart edges, so every MTF50 is a scene-dependent
@@ -86,7 +86,7 @@ iqa/cli.py       `python -m iqa analyze | sfr | chart | report | demo`
 iqa/synth.py     synthetic ground-truth images (edges, scenes, both charts)
 media/           the narrated explainer video generator
 mac/IQCoach/     the macOS coaching app (SwiftUI; 77 tests)
-tests/           102 tests (test_adversarial.py pins the review's findings)
+tests/           116 tests (test_adversarial.py pins the review's findings)
 ```
 
 ## License
