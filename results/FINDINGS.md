@@ -166,7 +166,7 @@ Highlight and shadow clipping had been measured after the Display P3 -> sRGB con
 P3 colour outside the sRGB gamut clips a channel to 255 in that conversion and was counted as a blown
 highlight. It is now measured in the file's own encoding before conversion (`native_clip_stats` in
 `iqa/imageio.py`), and the sRGB-only excess is reported as `clip_gamut_pct`. Every other column is
-unchanged. The effect on this library, which is 328 of 389 Display P3 files:
+unchanged except `clip_low_pct`, see the correction below. The effect on this library, which is 328 of 389 Display P3 files:
 
 - Frames with more than 1 % blown highlights: **165 -> 105**. iPhone 17 Pro Max 90 -> 54 of 206,
   iPhone 13 39 -> 23 of 85, iPhone XR 13 -> 6 of 21; the Nikon D850's sRGB JPEGs 3 -> 3 of 36, as
@@ -178,3 +178,14 @@ unchanged. The effect on this library, which is 328 of 389 Display P3 files:
 
 The slip was found by the IQ Coach build, which compared the analyzer's figure for a screen photo with
 the pixels it was drawing. This is the kind of error the "say what you do not trust" rule exists for.
+
+**Correction (2026-10-23).** The fifth-run commit also changed `clip_low_pct` by mistake: the new
+native-encoding helper counted a pixel as crushed when *any* channel was at or below 1, not *all*
+channels as documented. That inflated crushed shadows roughly sevenfold (189 frames over 1 % instead
+of 24; iPhone 17 Pro Max 117 of 206 instead of 17; Nikon D850 12 of 36 instead of 0). The helper now
+uses the brightest channel (`native_clip_stats`, pinned by a test with a (0, 0, 200) pixel). The
+library's originals are no longer on this Mac (Photos now keeps them in iCloud), so the column was
+restored from the fourth run, which used the same all-channels definition after sRGB conversion; a
+verifier recomputed the native values from the originals before they left and found the same counts
+at every threshold (24 frames over 1 %, 41 over 0.5 %, maximum 16.7 %). Found by the adversarial
+discrepancy sweep.

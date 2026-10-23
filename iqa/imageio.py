@@ -238,8 +238,9 @@ def load_image(path: str, max_side: int | None = None) -> LoadedImage:
 def native_clip_stats(rgb8: np.ndarray) -> tuple[float, float]:
     """(% of pixels with any channel >= 254, % with all channels <= 1) in the array's own encoding."""
     mx = rgb8.max(axis=2)
-    mn = rgb8.min(axis=2)
-    return float(100.0 * np.mean(mx >= 254)), float(100.0 * np.mean(mn <= 1))
+    # A pixel is crushed only when its brightest channel is at the floor (all channels <= 1),
+    # the same definition as iqa/exposure.py; a saturated blue (0, 0, 200) is not a shadow.
+    return float(100.0 * np.mean(mx >= 254)), float(100.0 * np.mean(mx <= 1))
 
 
 def rgb8_from_linear(lin: np.ndarray) -> np.ndarray:

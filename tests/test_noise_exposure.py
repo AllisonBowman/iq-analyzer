@@ -77,3 +77,16 @@ def test_clipping_is_measured_before_the_profile_conversion(tmp_path, monkeypatc
     assert abs(rec["clip_high_pct"] - 6.25) < 0.01, rec["clip_high_pct"]
     assert abs(rec["clip_gamut_pct"] - 50.0) < 0.01, rec["clip_gamut_pct"]   # the red half clipped only in sRGB
     assert rec["clip_low_pct"] == 0.0
+
+
+def test_native_shadow_clipping_needs_every_channel_at_the_floor():
+    """(0, 0, 200) is a saturated blue, not a crushed shadow; (1, 1, 1) is crushed; (255, 0, 0)
+    is a blown highlight (any channel at the top)."""
+    from iqa.imageio import native_clip_stats
+    a = np.full((10, 10, 3), 120, dtype=np.uint8)
+    a[0, :5] = (0, 0, 200)      # 5 % of pixels: one channel at zero, must not count as crushed
+    a[1, :3] = (1, 1, 1)        # 3 %: crushed
+    a[2, :2] = (255, 0, 0)      # 2 %: blown (any channel >= 254)
+    hi, lo = native_clip_stats(a)
+    assert abs(hi - 2.0) < 1e-9, hi
+    assert abs(lo - 3.0) < 1e-9, lo

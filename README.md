@@ -6,7 +6,7 @@ with CSV/JSON output, charts and a markdown report. Reads RAW (CR2/NEF/ARW/DNG/R
 JPEG, HEIC, PNG and TIFF.
 
 Built to be checked, not just plausible: every measurement is validated against synthetic
-images with known ground truth (`tests/`, 64 tests), `iqa demo` reproduces that check end to
+images with known ground truth (`tests/`, 102 tests), `iqa demo` reproduces that check end to
 end, and the tool reports what it could *not* measure (clipped or shaded edges, extrapolated
 noise levels, dynamic-range lower bounds) instead of printing a number anyway. A first
 adversarial review by a separate Claude Code session (`REVIEW.md`) found 13 issues; the
@@ -18,7 +18,7 @@ are stated in the report's "How to read these numbers".
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python -m pytest -q                      # 88 tests: SFR vs analytic MTF (with pixel aperture), noise vs injected sigma, CIEDE2000 vs the published pairs, synthetic charts, adversarial cases
+python -m pytest -q                      # 102 tests: SFR vs analytic MTF (with pixel aperture), noise vs injected sigma, CIEDE2000 vs the published pairs, synthetic charts, adversarial cases
 python -m iqa demo --out results_demo    # synthetic scenes with known blur/noise, analysed end to end
 python -m iqa analyze ~/Pictures/export --out results --sample 60 -r
 open results/report.md
@@ -85,8 +85,8 @@ iqa/report.py    CSV, JSON, charts, report.md
 iqa/cli.py       `python -m iqa analyze | sfr | chart | report | demo`
 iqa/synth.py     synthetic ground-truth images (edges, scenes, both charts)
 media/           the narrated explainer video generator
-mac/IQCoach/     the macOS coaching app (SwiftUI; 43 tests)
-tests/           88 tests (test_adversarial.py pins the review's findings)
+mac/IQCoach/     the macOS coaching app (SwiftUI; 77 tests)
+tests/           102 tests (test_adversarial.py pins the review's findings)
 ```
 
 ## License

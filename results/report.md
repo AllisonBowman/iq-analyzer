@@ -1,6 +1,6 @@
-# Allison's Photos library, all 389 camera captures
+# x
 
-Generated 2026-10-15 08:38 by iqa on 389 images.
+Generated 2026-10-23 03:18 by iqa on 389 images.
 
 ## Summary
 
@@ -17,7 +17,7 @@ Generated 2026-10-15 08:38 by iqa on 389 images.
 | Chroma noise at mid-grey (8-bit std) | 0.54 | 0.00 | 2.09 | 337 |
 | Dynamic range @ SNR 4 (stops, output-referred) | 6.3 | 2.3 | 8.6 | 72 |
 | Highlight clipping (% pixels) | 0.42 | 0.00 | 14.70 | 389 |
-| Shadow clipping (% pixels) | 0.95 | 0.00 | 71.75 | 389 |
+| Shadow clipping (% pixels) | 0.02 | 0.00 | 16.66 | 389 |
 | Noise whiteness (0.14 = white; higher = NR / compression) | 0.42 | 0.10 | 0.93 | 389 |
 | Colorfulness (Hasler-Suesstrunk) | 38.6 | 6.9 | 129.8 | 389 |
 
