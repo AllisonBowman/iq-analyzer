@@ -123,7 +123,7 @@ SLIDES = [
   "Screen photo: two bright spots at plus and minus 0.25 cycles per pixel, a 4-pixel stripe period",
   "Nikon D850 water: a smooth radial blob, nothing sharp",
   "Per-image cost about one second; 6,597 patches on the screen photo, 50,895 on the D850 frame",
-  "Normalised peak: 15 for the screen, 2.3 for the Nikon, threshold 6"],
+  "Normalised peak: 15 for the screen, 1.7 for the Nikon, threshold 6"],
  os.path.join(ASSETS, "fig_crops_spectra.png"),
  "Here is what it does, with the two real files. The top row is the screen photo, the bottom row the Nikon. "
  "The first column is a crop; the second is the residual the estimator actually sees, and you can already make "
@@ -132,8 +132,8 @@ SLIDES = [
  "patch cannot reliably see a pattern whose power is a fraction of the noise, but the pattern sits at the same "
  "frequency in every patch, so it adds coherently, while the noise averages toward a flat one. The screen photo "
  "shows two bright spots at plus and minus a quarter cycle per pixel, a four-pixel stripe period. The Nikon frame "
- "is a smooth radial blob. The fourth column is the normalised peak statistic: fifteen for the screen, two "
- "point three for the Nikon, against a threshold of six."),
+ "is a smooth radial blob. The fourth column is the normalised peak statistic: fifteen for the screen, one "
+ "point seven for the Nikon, against a threshold of six."),
 
 ("Four things that did not work, and the fix",
  ["Max over median of all bins: explodes on noise-reduced images, because the high-frequency median is near zero. Smoothed noise scored 430,000",
@@ -168,7 +168,7 @@ SLIDES = [
  "JPEG-blocked noise, score between one and one point eight. Thirty-four ordinary library files from five cameras, "
  "including the four former false positives, score between one point three and three point two. On the positive "
  "side, sinusoids at half the noise amplitude score fifteen to forty-eight, a noise-strength grid covering just "
- "eleven percent of the frame scores sixteen, and the library's screen photos score eleven, fifteen and one hundred "
+ "eleven percent of the frame scores sixteen, and the library's four screen photos score eleven to one hundred "
  "twenty-seven. Six is the geometric midpoint of three point two and eleven point three, a factor of one point nine "
  "on each side. Two kinds of bins are excluded from the search: anything below three cycles per patch, where the "
  "sigma-eight high-pass still shapes the spectrum, and the whole Nyquist row and column, because a two-pixel "
@@ -218,18 +218,18 @@ SLIDES = [
  "which is exactly what the role has."),
 
 ("Questions to expect, and the answers in the repo",
- ["Why natural edges instead of a chart? Every figure is a scene-dependent lower bound; it is consistent across cameras, and chart mode is roadmap item 3",
+ ["Why natural edges instead of a chart? Every figure is a scene-dependent lower bound; it is consistent across cameras, and chart mode, now built, gives the absolute figure on a printed chart",
   "Why output-referred? RAW and JPEG are only comparable in the output encoding; the cost is that you compare pipelines, not sensors",
   "How do you know the SFR is right? Analytic Gaussian within 4 %; pixel-aperture truth within 1.5 %; MTF50 only below Nyquist",
   "What is wrong with your numbers? Few valid edges per natural image; DR is mostly lower bounds; HEIC vs JPEG in a Photos library is not original vs processed",
   "How would you measure noise reduction properly? Matched RAW and HEIC pairs of the same shot on a grey patch"],
  None,
  "Expect these questions. Why natural edges instead of a chart: because a real edge is never a perfect step, every "
- "figure is a scene-dependent lower bound on the system MTF, consistent across cameras, and chart mode is the next "
- "roadmap item. Why output-referred: because RAW and JPEG are only comparable in the output encoding, and the price "
+ "figure is a scene-dependent lower bound on the system MTF, consistent across cameras, and chart mode, now built, "
+ "measures the absolute figure on a printed chart. Why output-referred: because RAW and JPEG are only comparable in the output encoding, and the price "
  "is that you compare pipelines, not sensors. How do you know the SFR code is right: analytic Gaussian within four "
  "percent, pixel-aperture truth within one and a half percent, MTF fifty searched below Nyquist only. What is wrong "
- "with your numbers: natural scenes give about seven valid edges per image where any exist, dynamic range is mostly "
+ "with your numbers: natural scenes give about five valid edges per image where any exist, dynamic range is mostly "
  "a lower bound because few frames contain near-black flat areas, and the HEIC versus JPEG split in a Photos library "
  "is not camera-original versus processed, because the JPEGs are likely shared copies. How would you measure noise "
  "reduction properly: matched RAW and HEIC pairs of the same shot, compared on a grey patch."),
@@ -269,17 +269,17 @@ SLIDES = [
  "energy at multiples of one eighth cycle per pixel."),
 
 ("What is next, and what to say about it",
- ["Strip the path column from results.csv and add a --no-paths flag so the repo can be public",
-  "Chart mode: detect an ISO 12233 e-SFR chart or a ColorChecker; add Delta E 2000 colour accuracy and white-balance error",
-  "Uncertainty: a bootstrap confidence interval on per-image MTF50 from the per-edge spread",
-  "A two-cluster split for shallow depth-of-field frames instead of the p80; matched RAW and HEIC pairs",
+ ["Done since the first cut: public repo without file paths, chart mode (ColorChecker dE00, e-SFR field map), bootstrap intervals, the in-focus/background split, structure analysis",
+  "Next: photograph a real ColorChecker and e-SFR chart; chart mode has only seen rendered charts",
+  "Next: matched RAW and HEIC pairs of the same shot, to measure what the phone pipeline does to noise and sharpening",
   "Say what is not done as plainly as what is; that is the habit the findings file already shows"],
  None,
- "Finally, what is next, because an interviewer will ask. Strip the path column so the repository can go public. "
- "Chart mode, which completes the ISO metric set the posting names: detect an e-SFR chart or a ColorChecker and add "
- "Delta E two thousand colour accuracy. A bootstrap confidence interval on MTF fifty from the per-edge spread, so "
- "every sharpness figure carries its uncertainty. And matched RAW and HEIC pairs to measure what the phone pipeline "
- "does, properly. Say what is not done as plainly as what is. That habit is already in the findings file, and it is "
+ "Finally, what is next, because an interviewer will ask. Since the first cut the repository went public without file "
+ "paths, chart mode was built for a ColorChecker and an e-SFR chart, every sharpness figure gained a bootstrap interval, "
+ "and shallow depth-of-field frames get an in-focus and a background figure. What remains is the part that needs a "
+ "camera: photograph a real ColorChecker and a real e-SFR chart, because chart mode has only seen rendered charts, and "
+ "shoot matched RAW and HEIC pairs to measure what the phone pipeline does. Say what is not done as plainly as what is. "
+ "That habit is already in the findings file, and it is "
  "the strongest thing in this project."),
 ]
 

@@ -63,7 +63,7 @@ def normalise(Sbar):
 
 def fig_crops_and_spectra():
     panels = []
-    for name, path in (("Screen photo (iPhone 17 Pro Max, ISO 125)", SCREEN), ("Nikon D850 JPEG, ISO 100", D850)):
+    for name, path in (("Screen photo (iPhone 17 Pro Max, ISO 125)", SCREEN), ("Nikon D850 JPEG, ISO 720", D850)):
         li = load_image(path); img, resid, cy, cx = candidates(li.rgb8)
         peak, freq, excl = periodic_texture(resid, cy, cx, N)
         if excl.any():
