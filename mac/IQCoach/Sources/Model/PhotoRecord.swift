@@ -20,6 +20,10 @@ struct PhotoRecord: Codable, Identifiable, Sendable, Hashable {
     var edgesMeasured: Int? = nil
     var edgesCenter: Int? = nil
     var edgesOuter: Int? = nil
+    /// Candidate edges the finder offered before the quality gates (iqa/edges.py).
+    var edgesCandidates: Int? = nil
+    /// Why candidates were rejected, as the analyzer writes it: "plateau_noise=2;shading=1".
+    var edgesRejectReasons: String? = nil
     var mtf50MedianCPP: Double? = nil
     var mtf50MedianCILo: Double? = nil
     var mtf50MedianCIHi: Double? = nil
@@ -77,6 +81,8 @@ struct PhotoRecord: Codable, Identifiable, Sendable, Hashable {
         case edgesMeasured = "edges_measured"
         case edgesCenter = "edges_center"
         case edgesOuter = "edges_outer"
+        case edgesCandidates = "edges_candidates"
+        case edgesRejectReasons = "edges_reject_reasons"
         case mtf50MedianCPP = "mtf50_median_cpp"
         case mtf50MedianCILo = "mtf50_median_ci_lo_cpp"
         case mtf50MedianCIHi = "mtf50_median_ci_hi_cpp"
@@ -178,6 +184,8 @@ extension PhotoRecord {
         mtf50P80CILo = num(.mtf50P80CILo)
         mtf50P80CIHi = num(.mtf50P80CIHi)
         clipGamutPct = num(.clipGamutPct)
+        edgesCandidates = int(.edgesCandidates)
+        edgesRejectReasons = str(.edgesRejectReasons)
     }
 }
 
@@ -257,6 +265,25 @@ extension PhotoRecord {
 
     var isFront: Bool { (lens ?? "").lowercased().contains("front") }
 
+    /// The key preferences use for this photo (intent tags, checks).
+    var key: PhotoKey { PhotoKey(camera: camera, file: file, datetime: datetime) }
+
+    /// The analyzer's edge rejections in plain words, most frequent first; unknown keys are kept with their raw name.
+    var rejectReasons: [(reason: EdgeRejectReason, count: Int)] {
+        guard let s = edgesRejectReasons, !s.isEmpty else { return [] }
+        var out: [(reason: EdgeRejectReason, count: Int)] = []
+        for part in s.split(separator: ";") {
+            let kv = part.split(separator: "=", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+            guard let k = kv.first, !k.isEmpty else { continue }
+            let n = kv.count > 1 ? Int(kv[1]) ?? 0 : 0
+            guard n > 0 else { continue }
+            out.append((EdgeRejectReason(key: k), n))
+        }
+        return out.enumerated().sorted { a, b in
+            a.element.count != b.element.count ? a.element.count > b.element.count : a.offset < b.offset
+        }.map(\.element)
+    }
+
     private static let exifFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
@@ -274,5 +301,54 @@ extension PhotoRecord {
 
     static func decodeAll(from data: Data) throws -> [PhotoRecord] {
         try makeDecoder().decode([PhotoRecord].self, from: data)
+    }
+}
+
+/// "<camera_model>|<file>|<datetime>": survives --no-paths; the datetime separates repeated DSLR names such as DSC_0001.
+struct PhotoKey: Codable, Hashable, Sendable, RawRepresentable, Comparable {
+    var rawValue: String
+    init(rawValue: String) { self.rawValue = rawValue }
+    init(camera: String, file: String, datetime: String?) { rawValue = "\(camera)|\(file)|\(datetime ?? "")" }
+    static func < (a: PhotoKey, b: PhotoKey) -> Bool { a.rawValue < b.rawValue }
+}
+
+/// Why the analyzer rejected a candidate edge, in plain words (keys from iqa/edges.py).
+enum EdgeRejectReason: Hashable, Sendable {
+    case plateauNoise, clipped, contrastGT1, stepTooSmall, shading, fitResidual, noMTF50BelowNyquist
+    case slant, riseWidth, notAStep, error
+    case other(String)
+
+    init(key: String) {
+        switch key {
+        case "plateau_noise": self = .plateauNoise
+        case "clipped": self = .clipped
+        case "contrast_gt_1": self = .contrastGT1
+        case "step_too_small": self = .stepTooSmall
+        case "shading": self = .shading
+        case "fit_residual": self = .fitResidual
+        case "no_mtf50_below_nyquist": self = .noMTF50BelowNyquist
+        case "slant": self = .slant
+        case "rise_width": self = .riseWidth
+        case "not_a_step": self = .notAStep
+        case "error": self = .error
+        default: self = .other(key)
+        }
+    }
+
+    var words: String {
+        switch self {
+        case .plateauNoise: "too noisy on either side"
+        case .clipped: "touched pure white or black"
+        case .contrastGT1: "an invalid contrast reading"
+        case .stepTooSmall: "too little contrast"
+        case .shading: "uneven light across the edge"
+        case .fitResidual: "not straight enough"
+        case .noMTF50BelowNyquist: "could not be read within the pixel grid"
+        case .slant: "at the wrong angle (the method needs 1 to 16°)"
+        case .riseWidth: "blurred over too many pixels"
+        case .notAStep: "a thin line or double edge, not a step"
+        case .error: "the measurement could not be computed"
+        case .other(let raw): raw
+        }
     }
 }

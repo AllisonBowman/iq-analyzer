@@ -11,30 +11,31 @@ struct ExampleFileTests {
         #expect(r.exampleFiles == expected, sourceLocation: sourceLocation)
     }
 
-    @Test func highlightsPicksTheFourMostClipped() {
+    @Test func highlightsPicksRepresentativeClippedPhotos() {
+        // Representative of the photos over 1 % (2...11, median 6.5), not the most clipped (spec §4.6).
         let cam = Fx.camera(12) { i, p in p.clipHighPct = Double(i) }
         let r = CameraRules.highlightDiscipline(cam)
-        check(r, files: ["p11.jpg", "p10.jpg", "p9.jpg", "p8.jpg"])
-        #expect(r?.exampleCaptions.first == "11.0 %")
+        check(r, files: ["p6.jpg", "p7.jpg", "p5.jpg", "p8.jpg"])
+        #expect(r?.exampleCaptions.first == "6.0 %")
     }
 
-    @Test func shadowsPicksTheFourMostCrushed() {
+    @Test func shadowsPicksRepresentativeCrushedPhotos() {
         let cam = Fx.camera(12) { i, p in p.clipLowPct = Double(i) }
-        check(CameraRules.shadowDiscipline(cam), files: ["p11.jpg", "p10.jpg", "p9.jpg", "p8.jpg"])
+        check(CameraRules.shadowDiscipline(cam), files: ["p6.jpg", "p7.jpg", "p5.jpg", "p8.jpg"])
     }
 
-    @Test func isoCeilingPicksLowestSNRAboveTheCeiling() {
+    @Test func noiseByISOPicksLowestSNRAboveTheCeiling() {
         let cam = Fx.camera(12) { i, p in
             if i < 6 { p.iso = 50; p.snrMidgreyDB = 38 } else { p.iso = 800; p.snrMidgreyDB = Double(20 + i) }
         }
-        let r = CameraRules.isoCeiling(cam)
+        let r = CameraRules.noiseByISO(cam)
         check(r, files: ["p6.jpg", "p7.jpg", "p8.jpg", "p9.jpg"])
         #expect(r?.exampleCaptions.first == "26.0 dB")
     }
 
-    @Test func isoCeilingFallsBackToTheCeilingBandWhenNothingIsAbove() {
+    @Test func noiseByISOFallsBackToTheCeilingBandWhenNothingIsAbove() {
         let cam = Fx.camera(12) { i, p in p.iso = 50; p.snrMidgreyDB = Double(30 + i) }
-        check(CameraRules.isoCeiling(cam), files: ["p0.jpg", "p1.jpg", "p2.jpg", "p3.jpg"])
+        check(CameraRules.noiseByISO(cam), files: ["p0.jpg", "p1.jpg", "p2.jpg", "p3.jpg"])
     }
 
     @Test func fieldSoftnessPicksLowestOuterToCentreRatios() {
@@ -54,9 +55,11 @@ struct ExampleFileTests {
         #expect(Set(r.exampleFiles) == ["p4.jpg", "p5.jpg", "p6.jpg", "p7.jpg"])
     }
 
-    @Test func colourLeanPicksLargestLeans() {
+    @Test func colourLeanPicksRepresentativeLeans() {
+        // Representative, not the largest: the largest leans are scene casts, not the camera's rendering.
         let cam = Fx.camera(12) { i, p in p.wbROverGStops = 0.2 + 0.02 * Double(i); p.wbBOverGStops = -0.02 }
-        check(CameraRules.colourLean(cam), files: ["p11.jpg", "p10.jpg", "p9.jpg", "p8.jpg"])
+        guard let r = CameraRules.colourLean(cam) else { Issue.record("rule did not fire"); return }
+        #expect(Set(r.exampleFiles) == ["p4.jpg", "p5.jpg", "p6.jpg", "p7.jpg"])
     }
 
     @Test func slowShutterPicksSoftestSlowFrames() {

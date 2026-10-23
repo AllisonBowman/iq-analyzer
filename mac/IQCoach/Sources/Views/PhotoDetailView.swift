@@ -1,20 +1,45 @@
 import SwiftUI
+import AppKit
 
+/// Layer 5: what to do to this picture, in what order, and what to leave alone; then the measurements.
 struct PhotoDetailView: View {
     let photo: PhotoRecord
-    @State private var editor: Editor = .applePhotos
+    var camera: CameraGroup?
+    var library: PhotoLibrary?
+    var intents: Set<IntentTag> = []
+    var editor: Editor = .applePhotos
+    var setEditor: ((Editor) -> Void)?
+    /// Adds or removes an intent tag on this photo.
+    var toggleIntent: ((IntentTag) -> Void)?
+    @State private var localEditor: Editor?
     @State private var overlay: PhotoOverlay
     @State private var content: ContentState = .idle
+    @State private var shownAnyway: Set<String> = []
     @Environment(\.isSnapshot) private var isSnapshot
 
-    init(photo: PhotoRecord, initialOverlay: PhotoOverlay = .none) {
+    init(photo: PhotoRecord, camera: CameraGroup? = nil, library: PhotoLibrary? = nil, intents: Set<IntentTag> = [],
+         editor: Editor = .applePhotos, setEditor: ((Editor) -> Void)? = nil, toggleIntent: ((IntentTag) -> Void)? = nil,
+         initialOverlay: PhotoOverlay = .none) {
         self.photo = photo
+        self.camera = camera
+        self.library = library
+        self.intents = intents
+        self.editor = editor
+        self.setEditor = setEditor
+        self.toggleIntent = toggleIntent
         _overlay = State(initialValue: initialOverlay)
     }
 
-    private var advice: [EditingAdvice] { EditingRules.advice(for: photo) }
+    private var currentEditor: Editor { localEditor ?? editor }
+
+    var context: PhotoContext {
+        PhotoContext(camera: camera, library: library, visionHorizonDeg: content.summary?.horizonDegrees, intents: intents)
+    }
+
+    private var advice: PhotoAdvice { EditingRules.advice(for: photo, context: context) }
 
     var body: some View {
+        let a = advice
         formOrStack {
             block(nil) {
                 imageSection
@@ -23,39 +48,88 @@ struct PhotoDetailView: View {
                     Text([photo.camera, photo.lens].compactMap { $0 }.joined(separator: " · ")).font(.callout).foregroundStyle(.secondary)
                     Text(settingsLine).font(.callout).monospacedDigit().foregroundStyle(.secondary)
                 }
+                if !intents.isEmpty { intentCapsules }
             }
-            block("What is in the picture") {
-                ContentSectionBody(state: content)
+            block("Do first") {
+                editorPicker
+                if a.nothingToFix {
+                    Label(EditingRules.nothingToFixText, systemImage: "checkmark.seal")
+                } else {
+                    ForEach(Array(a.doFirst.enumerated()), id: \.element.id) { i, adv in
+                        adviceCard(adv, number: i + 1)
+                    }
+                }
             }
-            block("Structure") {
-                StructureSectionBody(photo: photo, salientBox: content.summary?.salientBox)
+            if !a.also.isEmpty {
+                block(nil) {
+                    Disclosure(title: "Also (\(a.also.count))") {
+                        ForEach(a.also) { adviceCard($0, number: nil) }
+                    }
+                }
             }
-            block("Sharpness") {
-                row(.sharpnessLWPH); row(.sharpnessCPP); row(.overshoot)
+            if !a.silenced.isEmpty {
+                block(nil) {
+                    Disclosure(title: "You marked as intended (\(a.silenced.count))") {
+                        ForEach(a.silenced) { adv in
+                            if shownAnyway.contains(adv.id) {
+                                adviceCard(adv, number: nil)
+                            } else {
+                                HStack {
+                                    Text("\(adv.title) · \(adv.silencedBy?.word ?? "")").foregroundStyle(.secondary)
+                                    Spacer()
+                                    Button("Show Anyway") { shownAnyway.insert(adv.id) }
+                                }
+                            }
+                        }
+                    }
+                }
             }
-            block("Noise") {
+            block(nil) {
+                Disclosure(title: "Checked, nothing to do (\(a.checked.count))") {
+                    Text(a.checked.map(\.text).joined(separator: " · ")).font(.callout).monospacedDigit()
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if !a.notMeasured.isEmpty {
+                    Disclosure(title: "Not measured (\(a.notMeasured.count))") {
+                        ForEach(a.notMeasured, id: \.self) { Text($0.text).font(.callout).fixedSize(horizontal: false, vertical: true) }
+                    }
+                }
+            }
+            block("Measurements") {
+                Text("Sharpness").font(.subheadline.weight(.semibold))
+                row(.sharpnessLWPH); row(.overshoot)
+                Text("Noise").font(.subheadline.weight(.semibold)).padding(.top, 4)
                 row(.snr); row(.whiteness)
                 if let note = PhotoReading.noiseNote(photo) {
                     Label(note, systemImage: "exclamationmark.triangle")
                         .font(.callout)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-            }
-            block("Exposure and colour") {
+                Text("Exposure and colour").font(.subheadline.weight(.semibold)).padding(.top, 4)
                 row(.highlightClip); row(.shadowClip); row(.dynamicRange); row(.tonalRange); row(.whiteBalance); row(.colorfulness)
             }
-            block("Editing advice") {
-                editorPicker
+            block("Structure") {
+                StructureSectionBody(photo: photo, salientBox: content.summary?.salientBox)
             }
-            if EditingRules.isNothingToFix(advice) {
-                block(nil) { Label(EditingRules.nothingToFixText, systemImage: "checkmark.seal") }
-            } else {
-                ForEach(advice) { a in
-                    block(title(for: a)) { adviceCard(a) }
+            block("What is in the picture") {
+                ContentSectionBody(state: content)
+            }
+        }
+        .toolbar {
+            if !isSnapshot {
+                ToolbarItem {
+                    Button {
+                        let md = MarkdownExport.editingSteps(for: photo, advice: a, editor: currentEditor, library: library)
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(md, forType: .string)
+                    } label: {
+                        Label("Copy Editing Steps", systemImage: "checklist")
+                    }
+                    .help("Copy this photo's editing steps as a Markdown checklist")
                 }
             }
         }
-        .onChange(of: photo.id) { overlay = .none }
+        .onChange(of: photo.id) { overlay = .none; shownAnyway = [] }
         .task(id: photo.id) {
             content = .idle
             guard !isSnapshot else { return }
@@ -92,11 +166,30 @@ struct PhotoDetailView: View {
 
     private var settingsLine: String {
         var parts: [String] = []
-        if let i = photo.iso { parts.append("ISO \(Fmt.int(i))") }
+        if let i = photo.iso { parts.append(Fmt.iso(i)) }
         if let e = photo.exposureS { parts.append(Fmt.shutter(e)) }
         if let f = photo.fNumber { parts.append("f/\(Fmt.num(f, 1))") }
         if let d = photo.date { parts.append(d.formatted(date: .abbreviated, time: .shortened)) }
         return parts.joined(separator: " · ")
+    }
+
+    /// The photographer's intent tags, each removable.
+    private var intentCapsules: some View {
+        FlowLayout(spacing: 6) {
+            ForEach(IntentTag.allCases.filter(intents.contains)) { tag in
+                HStack(spacing: 4) {
+                    Label(tag.word, systemImage: "hand.raised").font(.callout)
+                    if let toggleIntent {
+                        Button { toggleIntent(tag) } label: { Image(systemName: "xmark.circle.fill") }
+                            .buttonStyle(.borderless)
+                            .help("Remove \(tag.word)")
+                            .accessibilityLabel("Remove \(tag.word)")
+                    }
+                }
+                .padding(.horizontal, 10).padding(.vertical, 3)
+                .background(.fill.tertiary, in: Capsule())
+            }
+        }
     }
 
     /// The photo is the centre of the screen: large, with an overlay chooser and a caption under it.
@@ -114,13 +207,15 @@ struct PhotoDetailView: View {
         if isSnapshot {
             HStack(spacing: 8) {
                 ForEach(Editor.allCases) { e in
-                    Text(e.rawValue).font(.callout.weight(e == editor ? .semibold : .regular))
+                    Text(e.rawValue).font(.callout.weight(e == currentEditor ? .semibold : .regular))
                         .padding(.horizontal, 12).padding(.vertical, 4)
-                        .background(e == editor ? AnyShapeStyle(.selection) : AnyShapeStyle(.fill.quaternary), in: Capsule())
+                        .background(e == currentEditor ? AnyShapeStyle(.selection) : AnyShapeStyle(.fill.quaternary), in: Capsule())
                 }
             }
         } else {
-            Picker("Editor", selection: $editor) {
+            Picker("Editor", selection: Binding(get: { currentEditor }, set: { e in
+                if let setEditor { setEditor(e) } else { localEditor = e }
+            })) {
                 ForEach(Editor.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
@@ -129,19 +224,32 @@ struct PhotoDetailView: View {
         }
     }
 
-    private func title(for a: EditingAdvice) -> String {
-        a.metric?.displayName ?? (a.id.hasPrefix("dark") ? "Exposure: dark" : a.id.hasPrefix("bright") ? "Exposure: bright"
-            : a.id.hasPrefix("straighten") ? "Level edge" : a.id.hasPrefix("thirds") ? "Composition"
-            : a.id.hasPrefix("shallow") ? "Shallow depth of field" : "Moire")
-    }
-
-    @ViewBuilder private func adviceCard(_ a: EditingAdvice) -> some View {
+    @ViewBuilder private func adviceCard(_ a: EditingAdvice, number: Int?) -> some View {
         HStack(alignment: .top, spacing: 12) {
             OverlayImage(path: photo.path, overlay: a.overlay(for: photo), photo: photo, salientBox: nil, boxSize: 96)
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(number.map { "\($0). \(a.title)" } ?? a.title).font(.headline)
+                    GradeCapsule(grade: a.grade)
+                    Spacer()
+                    if let tag = a.silencedBy, let toggleIntent, !intents.contains(tag) {
+                        Menu {
+                            Button(tag.menuTitle) { toggleIntent(tag) }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                        }
+                        .menuStyle(.borderlessButton)
+                        .menuIndicator(.hidden)
+                        .fixedSize()
+                        .accessibilityLabel("More")
+                    }
+                }
                 Text(a.finding).fixedSize(horizontal: false, vertical: true)
-                Text("In \(editor.rawValue)").font(.subheadline.weight(.semibold))
-                Text(a.text(for: editor)).font(.callout).fixedSize(horizontal: false, vertical: true)
+                if let note = a.note {
+                    Text(note).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                Text("In \(currentEditor.rawValue)").font(.subheadline.weight(.semibold))
+                Text(a.text(for: currentEditor)).font(.callout).fixedSize(horizontal: false, vertical: true)
                 if let c = a.caution {
                     Label(c, systemImage: "exclamationmark.triangle")
                         .font(.callout).foregroundStyle(.secondary)
@@ -153,32 +261,38 @@ struct PhotoDetailView: View {
     }
 
     @ViewBuilder private func row(_ m: Metric) -> some View {
-        let v = m.value(of: photo)
+        let shown = MeasuredValue.photoText(m, photo)
+        let context = m.evidenceText(photo: photo).map { ("In this photo", $0) }
         LabeledContent {
             HStack(spacing: 8) {
-                if let gated = PhotoReading.notCountedText(m, photo) {
-                    Text(gated).monospacedDigit().foregroundStyle(.secondary)
-                } else if let v {
-                    Text(valueText(m, v)).monospacedDigit()
-                    if let b = PhotoReading.band(m, photo) { BandCapsule(band: b) }
-                } else {
-                    Text("Not measured").foregroundStyle(.secondary)
-                }
-                InfoButton(metric: m)
+                MeasuredValue(text: shown.text, dimmed: !shown.counted)
+                if shown.counted, let b = PhotoReading.band(m, photo) { BandCapsule(band: b) }
+                InfoButton(metric: m, context: context)
             }
         } label: {
             VStack(alignment: .leading, spacing: 0) {
-                Text(m.displayName)
-                Text(m.shortMeaning).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                Text(m.displayName).help(m.shortMeaning)
+                if (m == .sharpnessLWPH), photo.hasSharpnessFigure, let r = photo.p80RangeLWPH {
+                    Text("This photo's range \(Fmt.int(r.lowerBound))–\(Fmt.int(r.upperBound)) LW/PH").font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                } else {
+                    Text(m.shortMeaning).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                }
             }
         }
         .accessibilityElement(children: .combine)
     }
+}
 
-    private func valueText(_ m: Metric, _ v: Double) -> String {
-        if m == .dynamicRange && photo.drSNR4LowerBound == true { return "At least " + m.format(v) }
-        if (m == .sharpnessLWPH || m == .sharpnessCPP), let n = photo.edgesMeasured { return m.format(v) + " · " + Fmt.count(n, "edge") }
-        return m.format(v)
+/// The evidence word of one piece of photo advice.
+struct GradeCapsule: View {
+    let grade: EvidenceGrade
+    var body: some View {
+        Label(grade.word, systemImage: grade.symbol)
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 8).padding(.vertical, 2)
+            .background(.fill.tertiary, in: Capsule())
+            .help(grade.definition)
+            .accessibilityLabel("\(grade.word) evidence")
     }
 }
 

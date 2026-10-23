@@ -1,6 +1,6 @@
 # IQ Coach
 
-A macOS app (SwiftUI, Swift Charts, Swift Testing, macOS 15) that turns `results.json` from `python -m iqa analyze` into plain-language coaching: what each camera does well and badly, what to change when shooting, and what to do in Apple Photos, Lightroom or any editor to each photo. Spec: `docs/APP-IQ-COACH-SPEC.md`.
+A macOS app (SwiftUI, Swift Charts, Swift Testing, macOS 15) that turns `results.json` from `python -m iqa analyze` into plain-language coaching: what each camera does well and badly, what to change when shooting, and what to do in Apple Photos, Lightroom or any editor to each photo. Each camera screen opens with the one change most worth making, with a word and a photo count for how sure it is; the photographer can mark a finding as intended or start a check that measures her next photos against a frozen baseline. Spec: `docs/APP-IQ-COACH-SPEC.md` (shipped behaviour) and `docs/FEEDBACK-LAYERS-SPEC.md` (the design of the feedback layers).
 
 ## Build
 
@@ -34,14 +34,23 @@ Press Validate: it checks the file exists and that `python -c "import iqa"` work
 build/Build/Products/Debug/IQCoach.app/Contents/MacOS/IQCoach --snapshot ../../results/results.json /tmp/iqcoach-snaps
 ```
 
-Writes `library.png`, `camera-<first camera>.png`, `photo-<the most visibly clipped photo whose file is on disk>.png` (rendered with the Clipping overlay selected; when no photo's file exists it warns and shows a placeholder), `glossary.png` at 1400 pt wide, 2x. Tall screens are drawn unrolled to full height. AppKit-backed controls (Table, List, GroupBox content, segmented Picker, Form) cannot draw off-screen, so snapshots substitute plain-view equivalents; the live app uses the real controls.
+Writes `library.png`, `camera-<first camera>.png`, `onething.png` (every coached camera's one-thing card), `check.png` (a fixture before-and-after check), `sparse-<camera>.png` (the most-photographed camera with fewer than 5 photos), `photo-<the most visibly clipped photo whose file is on disk>.png` (rendered with the Clipping overlay selected; when no photo's file exists it warns and shows a placeholder), `glossary.png` (Metrics and Method), at 1400 pt wide (900 for the card snapshots), 2x. Tall screens are drawn unrolled to full height. AppKit-backed controls (Table, List, GroupBox content, segmented Picker, Form) cannot draw off-screen, so snapshots substitute plain-view equivalents; the live app uses the real controls.
 
 ## Layout
 
-- `Sources/Model`: PhotoRecord (NaN-tolerant decoding), Metric and bands, camera/lens grouping and summaries.
-- `Sources/Coaching`: the twelve camera rules (isoCeiling, noiseCharacter, lensComparison, fieldSoftness, highlightDiscipline, shadowDiscipline, sharpeningCharacter, colourLean, slowShutter, levelEdgeLean, shallowDepthHabit, apertureSweetSpot; the former sharpnessConfidence card was removed) and twelve photo editing rules, pure functions. Each figure uses the analyzer's validity gates (three valid edges for sharpness, halo and centre/outer; a clean SNR reading for noise).
-- `Sources/Views`, `Sources/App`, `Sources/Support`: UI, app entry and snapshot runner, analyzer process and formatting.
-- `Tests/IQCoachTests`: Swift Testing tests (every rule fires and stays quiet, band boundaries, decoding).
+- `Sources/Model`: PhotoRecord (NaN-tolerant decoding, edge reject reasons, `PhotoKey`), Metric and bands (with "how sure" and per-camera/per-photo evidence text), camera/lens grouping and the gated `CameraSummary`, Wilson and Newcombe intervals (`Stats`), `UserPreferences`, `CaptureCheck`.
+- `Sources/Coaching`: the evidence and effort vocabulary (`Evidence.swift`), intent tags and the device vocabulary (`RuleContext.swift`), twelve camera rules (noiseByISO, noiseCharacter, lensComparison, fieldSoftness, highlightDiscipline, shadowDiscipline, sharpeningCharacter, colourLean, slowShutter, apertureSweetSpot, levelEdgeLean, shallowDepthHabit) that each return a finding, a silent check with its numbers, or "not applicable"; the engine that picks the one thing; twelve photo editing rules sorted into Do first / Also / Checked / Not measured; capture checks; the sparse-camera summary. All pure functions.
+- `Sources/Views`: the one-thing card, check card, report-card tiles, coaching cards, photo screen, library, sidebar, glossary (Metrics and Method), shared components (`MeasuredValue`, `EvidenceCapsule`, `ActionGroups`, `WhyButton`).
+- `Sources/App`, `Sources/Support`: app entry, snapshot runner, analyzer process, preferences store, Markdown export, the Method text, formatting.
+- `Tests/IQCoachTests`: 189 Swift Testing tests (every rule fires and stays silent with numbers, the one thing per real camera, evidence boundaries, every Newcombe row of the check table, photo lists, preferences, checks, exports, band boundaries, decoding).
+
+## Gates
+
+Every figure uses the analyzer's validity gates: three valid edges for sharpness, halo and centre/outer; a clean SNR reading (not extrapolated, textured or periodic) for noise; frames that reached the noise floor for an exact dynamic range. A report-card figure needs 5 photos that pass its gate (`CameraSummary.minRowsForFigure`); fewer shows "Not enough photos" with the counts. Coaching starts at 5 photos per camera; a finding resting on fewer than 8 photos, or on a share whose 95 % range crosses its line, is Thin and goes under "Needs more photos".
+
+## Preferences
+
+Set-aside cards, intent tags (dark on purpose, bright on purpose, colour is the point, not meant to be level, composed this way), the editor and capture checks are kept in `~/Library/Application Support/IQCoach/preferences.json` (atomic writes, debounced a second). A file that does not decode is moved aside as `preferences.bad-<stamp>.json` and the app starts clean. Settings has Reset Preferences…. Tags are keyed by camera, file name and EXIF date, so a copy analysed from the Photos picker under another file name does not carry its tags across.
 
 ## Live-window captures
 

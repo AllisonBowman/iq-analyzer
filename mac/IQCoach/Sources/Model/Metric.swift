@@ -129,6 +129,97 @@ enum Metric: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// How sure a figure of this kind can be (the ⓘ popover's third block).
+    var howSure: String {
+        switch self {
+        case .sharpnessLWPH, .sharpnessCPP:
+            "Measured on real edges in your photos with the ISO 12233 slanted-edge method, so every figure is a lower bound that depends on the scene. One photo's figure carries its own range, from which edges happened to be measured; compare two photos only when they differ by more than 30 %. A camera median over many photos is the figure to trust."
+        case .snr:
+            "Output-referred: noise reduction and HEIC or JPEG compression lower it as much as the sensor does, so it compares processing across ISO and cameras, not sensors. Photos whose mid-grey had to be estimated, or whose flat areas were textured or held a repeating pattern, are left out."
+        case .highlightClip, .shadowClip:
+            "A direct count of pixels at the top (any channel 254 or above) or bottom (all channels 1 or below), in the file's own encoding: the most certain figure here. It cannot tell a blown sky from a white page."
+        case .overshoot:
+            "Read from the same natural edges as sharpness, so it counts only on photos with 3 or more usable edges; an edit that added sharpening shows up here too."
+        case .whiteBalance:
+            "Gray-world: assumes the scene averages to grey. A one-colour subject, a sunset or stage light moves it; a lean that holds across many scenes is the camera."
+        case .whiteness:
+            "Reliable only where noise is strong enough to measure: at low ISO, scene texture also raises it, so camera figures use photos above ISO 160 when there are enough."
+        case .dynamicRange:
+            "Often only a lower bound: the floor can be found only in frames with deep, flat shadows, and a JPEG's tone curve caps it."
+        case .tonalRange:
+            "Measured directly on this picture's tones (1st to 99th percentile); it describes the scene and the edit as much as the camera."
+        case .colorfulness:
+            "A direct measure of this picture's colours; it describes the scene, not the camera."
+        }
+    }
+
+    /// "In this camera": what the camera figure is a median of, and its spread. nil when the camera has no such figure.
+    func evidenceText(camera s: CameraSummary) -> String? {
+        let all = Fmt.count(s.photoCount, "photo")
+        switch self {
+        case .sharpnessLWPH, .sharpnessCPP:
+            guard s.hasSharpnessFigure, let v = s.sharpnessLWPH else {
+                return "\(s.sharpnessCounted) of \(all) had 3 or more usable edges; a camera figure needs \(CameraSummary.minRowsForFigure)."
+            }
+            var t = "\(Fmt.lwph(v)) is the median of \(s.sharpnessCounted) of \(all) with 3 or more usable edges"
+            if let q = s.sharpnessIQR { t += "; the middle half lies between \(Fmt.int(q.lowerBound)) and \(Fmt.int(q.upperBound))" }
+            if let w = s.p80RelativeWidthMedian { t += ". One photo's range is typically \(Fmt.share(w)) of its value wide" }
+            return t + "."
+        case .snr:
+            guard s.hasSNRFigure, let v = s.snr else { return "Only \(s.snrCounted) of \(all) gave a clean noise reading." }
+            return "\(Fmt.db(v)) is the median of the \(s.snrCounted) of \(all) with a clean reading."
+        case .highlightClip:
+            guard let m = s.clipHighMedian else { return nil }
+            return "Median \(Fmt.pct(m, 2)) over \(all); \(s.clipHighCount) lose more than 1 %."
+        case .shadowClip:
+            guard let m = s.clipLowMedian else { return nil }
+            return "Median \(Fmt.pct(m, 2)) over \(all); \(s.clipLowCount) lose more than 1 %."
+        case .overshoot:
+            guard s.hasOvershootFigure, let v = s.overshoot else { return "Only \(s.overshootCounted) of \(all) had 3 or more usable edges." }
+            return "\(Fmt.pct(v, 1)) is the median of the \(s.overshootCounted) of \(all) with 3 or more usable edges."
+        case .whiteBalance:
+            guard s.wbRStops != nil || s.wbBStops != nil else { return nil }
+            return "Median R/G \(Fmt.num(s.wbRStops ?? 0, 2)) and B/G \(Fmt.num(s.wbBStops ?? 0, 2)) stops over \(Fmt.count(s.wbCount, "photo"))."
+        case .whiteness:
+            if let w = s.whitenessAbove160 { return "Median \(Fmt.num(w, 2)) over the \(s.whitenessAbove160Count) clean photos above ISO 160." }
+            return s.whiteness.map { "Median \(Fmt.num($0, 2)) over all ISOs (fewer than \(CameraSummary.minRowsForFigure) clean photos above ISO 160)." }
+        case .dynamicRange:
+            guard let v = s.dynamicRange else { return nil }
+            return s.dynamicRangeIsLowerBound
+                ? "At least \(Fmt.stops(v, 1)): only \(s.drExactCount) of \(all) reached the noise floor."
+                : "\(Fmt.stops(v, 1)) is the median of the \(s.drExactCount) photos that reached the noise floor; \(s.drLowerBoundCount) more only show 'at least'."
+        case .tonalRange, .colorfulness:
+            return nil
+        }
+    }
+
+    /// "In this photo": how this one reading was made and what it rests on. nil when there is nothing to add.
+    func evidenceText(photo p: PhotoRecord) -> String? {
+        switch self {
+        case .sharpnessLWPH, .sharpnessCPP, .overshoot:
+            let n = p.edgesMeasured ?? 0
+            guard p.hasSharpnessFigure else {
+                return "Only \(Fmt.count(n, "usable edge")) in this photo; a figure needs \(PhotoRecord.minEdgesForSharpness), so it is not counted."
+            }
+            var t = "From \(Fmt.count(n, "usable edge"))"
+            if self != .overshoot, let r = p.p80RangeLWPH {
+                t += "; this photo's range is \(Fmt.int(r.lowerBound))–\(Fmt.int(r.upperBound)) LW/PH, from which edges happened to be measured"
+            }
+            return t + "."
+        case .snr:
+            if let r = p.snrExclusionReason { return "Not counted: \(r)." }
+            return p.snrMidgreyDB == nil ? nil : "A clean reading on the flat patches of this photo."
+        case .highlightClip, .shadowClip:
+            return "Counted over every pixel of the full-resolution file, in its own encoding."
+        case .dynamicRange:
+            return p.drSNR4LowerBound == true ? "A lower bound: no shadow in this photo was deep enough to reach the noise floor." : nil
+        case .whiteBalance:
+            return "Gray-world on this one scene: the light and the subject's colour count as much as the camera."
+        case .whiteness, .tonalRange, .colorfulness:
+            return nil
+        }
+    }
+
     var unit: String {
         switch self {
         case .sharpnessLWPH: "LW/PH"

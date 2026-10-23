@@ -102,7 +102,9 @@ Not done yet:
 The morning run, the periodic-texture detector, `--no-paths` (the repo is public) and chart mode
 (ColorChecker dE00 + WB, e-SFR field map; synthetic validation only) are done, 2026-10-13.
 The bootstrap interval (her task 4) is done too; results.csv carries it. **IQ Coach**, the macOS
-coaching app, is built under `mac/IQCoach/` (spec `docs/APP-IQ-COACH-SPEC.md`; 77 Swift tests as of 2026-10-23;
+coaching app, is built under `mac/IQCoach/` (spec `docs/APP-IQ-COACH-SPEC.md`; 189 Swift tests as of 2026-10-23, after the feedback layers of
+`docs/FEEDBACK-LAYERS-SPEC.md`: the one thing per camera, evidence words, set-aside and intent tags, capture checks,
+Markdown exports;
 `--snapshot` renders screens headless; `--window-shots` captures the live window but needs an awake
 display; `--open <results.json>` loads a file at launch). The app also identifies picture contents
 on-device with Apple's Vision framework (labels, faces, text, horizon, salient subject;
@@ -111,7 +113,8 @@ come in through the system picker (up to 20) or `--analyze-photos N`. The system
 end on 7 photos (two runs on 2026-10-15, `~/Library/Application Support/IQCoach/runs/20261015T043404`
 and `20261015T053032`); the two copies checked against the PhotoKit export (IMG_0448, IMG_0453) are
 byte-identical. Not yet exercised
-live by a session: Table sorting, the Vision section in the running window. Next: shoot a real
+live by a session: Table sorting, the Vision section in the running window, and the feedback layers'
+sheets, menus and popovers (checked only through `--snapshot` and tests). Next: shoot a real
 ColorChecker and e-SFR chart (`docs/CHART-SHOOT-HANDOFF.md`) to validate chart mode on a print; then the open review items (a
 two-cluster split for shallow-DOF frames; matched RAW/HEIC pairs). The step-by-step slide show
 lives at the Claude artifact "How iq-analyzer Reads a Photo" (figures from `media/deck_figures.py`). MORNING_PROMPT.md is kept for reference / re-runs. `media/make_explainer.py`

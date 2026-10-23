@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LibraryOverviewView: View {
     let library: PhotoLibrary
+    var prefs = UserPreferences()
     @Environment(AppModel.self) private var model: AppModel?
     @Environment(\.isSnapshot) private var isSnapshot
 
@@ -15,14 +16,14 @@ struct LibraryOverviewView: View {
             VStack(alignment: .leading, spacing: 32) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Library").font(.largeTitle.weight(.bold)).accessibilityAddTraits(.isHeader)
-                    Text("\(Fmt.count(library.photos.count, "photo")) from \(Fmt.count(library.cameras.count, "camera")) in \(library.sourceName)")
+                    Text(library.provenance + ".")
                         .font(.callout).foregroundStyle(.secondary)
                     if let h = CoachingEngine.headline(for: library.cameras) {
                         Text(h).font(.title3).padding(.top, 8).fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 VStack(alignment: .leading, spacing: 16) {
-                    SectionHeader(title: "Cameras", subtitle: "Report-card numbers for every camera. Pick one in the sidebar for its coaching.")
+                    SectionHeader(title: "Cameras", subtitle: "Each camera's one thing and report-card numbers; the count in brackets is the photos a figure rests on. Pick a camera in the sidebar for its coaching.")
                     cameraTable
                 }
                 if library.cameras.contains(where: { $0.representativePhoto != nil }) {
@@ -39,6 +40,8 @@ struct LibraryOverviewView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
+
+    private func oneThing(_ c: CameraGroup) -> String { CoachingEngine.oneThingLine(for: c, prefs: prefs) }
 
     private func cameraTile(_ c: CameraGroup) -> some View {
         Button { model?.sidebarSelection = .camera(c.model); model?.selectedPhotoID = nil } label: {
@@ -60,7 +63,8 @@ struct LibraryOverviewView: View {
             SnapshotGrid(columns: [
                 ("Camera", { $0.model }),
                 ("Photos", { String($0.photos.count) }),
-                ("Sharpness", { $0.summary.sharpnessCell }),
+                ("One thing", { oneThing($0) }),
+                ("Sharpness", { $0.summary.sharpnessCellWithCount }),
                 ("Noise", { $0.summary.noiseCell }),
                 ("Highlights", { Self.cell(.highlightClip, $0.summary.clipHighMedian) }),
                 ("Halo", { $0.summary.haloCell }),
@@ -70,7 +74,8 @@ struct LibraryOverviewView: View {
             Table(library.cameras) {
                 TableColumn("Camera") { c in Text(c.model).lineLimit(1) }.width(min: 140, ideal: 190)
                 TableColumn("Photos") { c in Text(c.photos.count.formatted()).monospacedDigit() }.width(60)
-                TableColumn("Sharpness") { c in Text(c.summary.sharpnessCell).monospacedDigit() }.width(min: 140, ideal: 180)
+                TableColumn("One thing") { c in Text(oneThing(c)).lineLimit(2).help(oneThing(c)) }.width(min: 160, ideal: 220)
+                TableColumn("Sharpness") { c in Text(c.summary.sharpnessCellWithCount).monospacedDigit() }.width(min: 140, ideal: 180)
                 TableColumn("Noise") { c in Text(c.summary.noiseCell).monospacedDigit() }.width(min: 110, ideal: 140)
                 TableColumn("Highlights") { c in Text(Self.cell(.highlightClip, c.summary.clipHighMedian)).monospacedDigit() }.width(min: 110, ideal: 140)
                 TableColumn("Halo") { c in Text(c.summary.haloCell).monospacedDigit() }.width(min: 100, ideal: 130)

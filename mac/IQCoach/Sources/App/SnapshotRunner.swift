@@ -13,7 +13,9 @@ enum SnapshotRunner {
         do {
             let data = try Data(contentsOf: URL(fileURLWithPath: input))
             let photos = try PhotoRecord.decodeAll(from: data)
-            let library = PhotoLibrary(sourceName: URL(fileURLWithPath: input).lastPathComponent, photos: photos)
+            let inURL = URL(fileURLWithPath: input)
+            let writtenDate = (try? inURL.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            let library = PhotoLibrary(sourceName: inURL.lastPathComponent, photos: photos, sourceDate: writtenDate)
             let dir = URL(fileURLWithPath: outputDirectory, isDirectory: true)
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             // The photo screen shows a clipped photo whose file is on disk, so the Clipping overlay has something to show:
@@ -28,10 +30,54 @@ enum SnapshotRunner {
                 LibraryOverviewView(library: library)
             }, to: dir.appendingPathComponent("library.png")))
             written.append(try render(canvas(library, selected: .camera(cam.model)) {
-                CameraReportView(camera: cam, selectedPhotoID: .constant(nil))
+                CameraReportView(camera: cam, selectedPhotoID: .constant(nil), library: library)
             }, to: dir.appendingPathComponent("camera-\(slug(cam.model)).png")))
+            // The one thing for every coached camera, stacked: the card the camera screen opens with.
             written.append(try render(AnyView(
-                PhotoDetailView(photo: photo, initialOverlay: .clipping)
+                VStack(alignment: .leading, spacing: 24) {
+                    ForEach(library.coachedCameras) { c in
+                        if let one = CoachingEngine.output(for: c).oneThing {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(c.model).font(.title3.weight(.semibold))
+                                OneThingCard(camera: c, oneThing: one)
+                            }
+                        }
+                    }
+                }
+                .padding(24)
+                .frame(width: 900, alignment: .topLeading)
+                .background(Color(nsColor: .windowBackgroundColor))
+                .environment(\.isSnapshot, true)
+                .environment(\.colorScheme, .light)),
+                to: dir.appendingPathComponent("onething.png"), width: 900))
+            // A check in progress: the first camera's one thing with a fixture check, its baseline frozen from these
+            // results and twenty made-up new photos, one of them blown (spec §5: "It worked").
+            if let one = CoachingEngine.output(for: cam).oneThing, let kind = one.insight?.checkKind {
+                var check = CheckComparison.start(kind, camera: cam, library: library, intents: [:], now: Date(timeIntervalSince1970: 1_792_022_400))
+                for i in 0..<20 {
+                    let key = PhotoKey(camera: cam.model, file: "IMG_\(9000 + i).HEIC", datetime: "2026:10:2\(i % 3) 12:00:00")
+                    check.after[key] = CaptureCheck.AfterRow(hit: i == 0, value: i == 0 ? 2.3 : 0.1 + 0.02 * Double(i), format: "heic", file: "IMG_\(9000 + i).HEIC", path: nil)
+                }
+                written.append(try render(AnyView(
+                    VStack(alignment: .leading, spacing: 24) {
+                        OneThingCard(camera: cam, oneThing: one)
+                        CheckCard(check: check)
+                    }
+                    .padding(24)
+                    .frame(width: 900, alignment: .topLeading)
+                    .background(Color(nsColor: .windowBackgroundColor))
+                    .environment(\.isSnapshot, true)
+                    .environment(\.colorScheme, .light)),
+                    to: dir.appendingPathComponent("check.png"), width: 900))
+            }
+            // The sparse screen for the most-photographed camera under five photos.
+            if let sparse = library.sparseCameras.first {
+                written.append(try render(canvas(library, selected: .camera(sparse.model)) {
+                    CameraReportView(camera: sparse, selectedPhotoID: .constant(nil), library: library, choosePhotos: {})
+                }, to: dir.appendingPathComponent("sparse-\(slug(sparse.model)).png")))
+            }
+            written.append(try render(AnyView(
+                PhotoDetailView(photo: photo, camera: library.camera(photo.camera), library: library, initialOverlay: .clipping)
                     .frame(width: 760)
                     .padding(.vertical, 24)
                     .frame(width: width)
@@ -93,7 +139,7 @@ enum SnapshotRunner {
         )
     }
 
-    private static func render(_ view: AnyView, to url: URL) throws -> URL {
+    private static func render(_ view: AnyView, to url: URL, width: CGFloat = SnapshotRunner.width) throws -> URL {
         let renderer = ImageRenderer(content: view)
         renderer.scale = 2
         renderer.proposedSize = ProposedViewSize(width: width, height: nil)
@@ -114,8 +160,14 @@ private struct StaticSidebar: View {
         VStack(alignment: .leading, spacing: 4) {
             row("Library", "square.grid.2x2", library.photos.count, selected == .library)
             Text("Cameras").font(.caption.weight(.semibold)).foregroundStyle(.secondary).padding(.top, 12).padding(.horizontal, 12)
-            ForEach(library.cameras) { c in
+            ForEach(library.coachedCameras) { c in
                 row(c.model, "camera", c.photos.count, selected == .camera(c.model))
+            }
+            if !library.sparseCameras.isEmpty {
+                Text("Too few photos").font(.caption.weight(.semibold)).foregroundStyle(.secondary).padding(.top, 12).padding(.horizontal, 12)
+                ForEach(library.sparseCameras) { c in
+                    row(c.model, "camera", c.photos.count, selected == .camera(c.model))
+                }
             }
         }
         .padding(12)

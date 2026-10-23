@@ -12,7 +12,7 @@ struct RootView: View {
         Group {
             if let library = model.library {
                 NavigationSplitView(columnVisibility: $visibility) {
-                    SidebarView(library: library, selection: $model.sidebarSelection, search: search)
+                    SidebarView(library: library, selection: $model.sidebarSelection, search: search, prefs: model.preferences.prefs)
                         .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
                 } content: {
                     contentColumn(library)
@@ -37,11 +37,17 @@ struct RootView: View {
                 Button { model.isPickingPhotos = true } label: { Label("Choose Photos…", systemImage: "photo.on.rectangle.angled") }
                     .help("Pick up to \(AppModel.maxPickedPhotos) photos from your Photos library to analyze (⇧⌘P)")
                 if let cam = model.selectedCamera {
-                    ShareLink(item: MarkdownExport.coaching(for: cam, insights: CoachingEngine.insights(for: cam)),
-                              subject: Text("Coaching for \(cam.model)")) {
-                        Label("Share Coaching", systemImage: "square.and.arrow.up")
+                    let prefs = model.preferences.prefs
+                    let out = CoachingEngine.output(for: cam, prefs: prefs)
+                    Menu {
+                        ShareLink("Share Coaching…", item: MarkdownExport.coaching(for: cam, output: out, checks: prefs.checks, library: model.library),
+                                  subject: Text("Coaching for \(cam.model)"))
+                        ShareLink("Share Pocket Card…", item: MarkdownExport.pocketCard(for: cam, output: out),
+                                  subject: Text("\(cam.model) pocket card"))
+                    } label: {
+                        Label("Share", systemImage: "square.and.arrow.up")
                     }
-                    .help("Share this camera's coaching as Markdown")
+                    .help("Share this camera's coaching, or a five-line pocket card, as Markdown")
                 }
             }
         }
@@ -73,15 +79,19 @@ struct RootView: View {
     @ViewBuilder private func contentColumn(_ library: PhotoLibrary) -> some View {
         @Bindable var model = model
         if let cam = model.selectedCamera {
-            CameraReportView(camera: cam, selectedPhotoID: $model.selectedPhotoID)
+            CameraReportView(camera: cam, selectedPhotoID: $model.selectedPhotoID, library: library,
+                             choosePhotos: { model.isPickingPhotos = true })
         } else {
-            LibraryOverviewView(library: library)
+            LibraryOverviewView(library: library, prefs: model.preferences.prefs)
         }
     }
 
     @ViewBuilder private var detailColumn: some View {
         if let photo = model.selectedPhoto {
-            PhotoDetailView(photo: photo)
+            let store = model.preferences
+            PhotoDetailView(photo: photo, camera: model.selectedCamera, library: model.library,
+                            intents: store.prefs.intents(for: photo), editor: store.prefs.editor,
+                            setEditor: { store.setEditor($0) }, toggleIntent: { store.toggle($0, for: photo) })
         } else {
             ContentUnavailableView(model.selectedCamera == nil ? "Choose a camera" : "Choose a photo",
                                    systemImage: model.selectedCamera == nil ? "camera" : "photo",
@@ -99,20 +109,31 @@ struct SidebarView: View {
         search.isEmpty ? library.cameras : library.cameras.filter { $0.model.localizedCaseInsensitiveContains(search) }
     }
 
+    var prefs = UserPreferences()
+
     var body: some View {
         List(selection: $selection) {
             Label("Library", systemImage: "square.grid.2x2")
                 .badge(library.photos.count)
                 .tag(SidebarItem.library)
             Section("Cameras") {
-                ForEach(cameras) { c in
-                    Label(c.model, systemImage: "camera")
-                        .badge(c.photos.count)
-                        .tag(SidebarItem.camera(c.model))
+                ForEach(cameras.filter { $0.photos.count >= CameraRules.minPhotos }) { row($0) }
+            }
+            let sparse = cameras.filter { $0.photos.count < CameraRules.minPhotos }
+            if !sparse.isEmpty {
+                Section("Too few photos") {
+                    ForEach(sparse) { row($0) }
                 }
             }
         }
         .listStyle(.sidebar)
+    }
+
+    private func row(_ c: CameraGroup) -> some View {
+        Label(c.model, systemImage: "camera")
+            .badge(c.photos.count)
+            .tag(SidebarItem.camera(c.model))
+            .help(CoachingEngine.oneThingLine(for: c, prefs: prefs))
     }
 }
 

@@ -103,7 +103,7 @@ struct DiscrepancyFixTests {
         #expect(r.title == "Your lenses resolve about the same detail")
         #expect(!r.finding.contains("front camera is"))
         #expect(r.finding.contains("Not compared: the front camera (a selfie camera"))
-        #expect(!r.actions.contains { $0.contains("front") })
+        #expect(!r.actionTexts.contains { $0.contains("front") })
         #expect(r.counted == 12)
     }
 
@@ -127,7 +127,13 @@ struct DiscrepancyFixTests {
             default: p.exposureS = 0.004; p.mtf50P80LWPH = 2600
             }
         }
-        #expect(CameraRules.slowShutter(cam) == nil)
+        // One gated slow back-camera frame (1/7 s): a Thin card, never counting the front camera or one-edge rows.
+        guard let r = CameraRules.slowShutter(cam) else { Issue.record("rule did not fire"); return }
+        #expect(r.grade == .thin)
+        #expect(r.title == "Slow shutter speeds may cost sharpness")
+        #expect(r.finding.hasPrefix("3 of your 14 photos were taken at 1/30 s or slower; only 1 had 3 or more usable edges."))
+        #expect(r.finding.contains("one photo cannot show a pattern"))
+        #expect(!r.finding.contains("front"))
     }
 
     @Test func slowShutterComparesWithinALensAndDropsHandHeld() {
@@ -137,7 +143,7 @@ struct DiscrepancyFixTests {
         guard let r = CameraRules.slowShutter(cam) else { Issue.record("rule did not fire"); return }
         #expect(r.finding.contains("40 % softer than faster frames from the same lens"))
         #expect(!r.finding.lowercased().contains("hand-held"))
-        #expect(r.counted == 12)
+        #expect(r.counted == 4)   // the slow photos the claim rests on
     }
 
     // MARK: Field softness per lens (F5 [high])
@@ -151,8 +157,8 @@ struct DiscrepancyFixTests {
         guard let r = CameraRules.fieldSoftness(cam) else { Issue.record("rule did not fire"); return }
         #expect(r.title == "Corners are softer than the centre on the main camera")
         #expect(r.finding.contains("40 % softer"))
-        #expect(r.actions.contains { $0.contains("the ultra-wide camera holds up better") })
-        #expect(!r.actions.contains { $0.contains("Avoid the ultra-wide") })
+        #expect(r.actionTexts.contains { $0.contains("the ultra-wide camera holds up better") })
+        #expect(!r.actionTexts.contains { $0.contains("Avoid the ultra-wide") })
         #expect(r.counted == 6)
     }
 
@@ -182,24 +188,27 @@ struct DiscrepancyFixTests {
 
     // MARK: ISO ceiling (APP-02, F4 [high], F6 [high], F13)
 
-    @Test func isoCeilingStopsAtTheFirstBandUnderTheMark() {
-        // iPhone 13 in results.json: 33.1, 33.5, 30.5, 35.4, 31.3 dB.
+    @Test func noiseByISOCallsANonFollowingCameraWhatItIs() {
+        // iPhone 13 in results.json: 33.1, 33.5, 30.5, 35.4, 31.3 dB. The 401-1000 band rises 4.8 dB above the band
+        // below it, so noise does not follow ISO and no ceiling is offered (feedback-layers spec §4.6).
         let cam = isoCam([(50, Array(repeating: 33.07, count: 6)), (100, Array(repeating: 33.52, count: 6)),
                           (250, Array(repeating: 30.54, count: 6)), (640, Array(repeating: 35.37, count: 5)),
                           (2000, Array(repeating: 31.33, count: 5))])
-        guard let r = CameraRules.isoCeiling(cam) else { Issue.record("rule did not fire"); return }
-        #expect(r.title == "Keep ISO at or below ISO 160 for clean pictures")
-        #expect(r.finding.contains("at ISO 161-400 it drops to 30.5 dB"))
-        #expect(r.finding.contains("does not simply follow ISO"))
+        guard let r = CameraRules.noiseByISO(cam) else { Issue.record("rule did not fire"); return }
+        #expect(r.title == "Noise does not follow ISO on this phone")
+        #expect(r.severity == .info)
+        #expect(r.finding.contains("30.5 dB at ISO 161-400 (6)"))
+        #expect(r.finding.contains("Above ISO 1000 your 5 photos range from 31.3 dB to 31.3 dB, too few to say where grain starts"))
         #expect(!r.why.contains("Higher ISO amplifies"))
+        #expect(r.actionTexts.first?.contains("ISO alone does not predict noise here") == true)
         #expect(r.counted == 28)
     }
 
-    @Test func isoCeilingDoesNotCallANonMonotonicCameraCleanEverywhere() {
+    @Test func noiseByISODoesNotCallANonMonotonicCameraCleanEverywhere() {
         // iPhone XR in results.json: 31.99 (<=64), 31.79 (161-400), 35.29 (401-1000).
         let cam = isoCam([(50, Array(repeating: 31.989, count: 6)), (250, Array(repeating: 31.794, count: 6)),
                           (640, Array(repeating: 35.289, count: 6))])
-        guard let r = CameraRules.isoCeiling(cam) else { Issue.record("rule did not fire"); return }
+        guard let r = CameraRules.noiseByISO(cam) else { Issue.record("rule did not fire"); return }
         #expect(r.title == "Noise does not follow ISO on this phone")
         #expect(!r.title.contains("clean at every ISO"))
         #expect(r.counted == 18)
@@ -210,18 +219,18 @@ struct DiscrepancyFixTests {
         let cam = isoCam([(64, [42.5, 42.5, 42.5]), (100, Array(repeating: 39.1, count: 10)), (250, Array(repeating: 37.8, count: 5)),
                           (640, Array(repeating: 35.8, count: 11)), (1100, [34.0]), (1250, [35.0]), (1400, [33.9]), (9000, [29.6])],
                          model: "NIKON D850", phone: false)
-        guard let r = CameraRules.isoCeiling(cam) else { Issue.record("rule did not fire"); return }
-        #expect(r.title == "Keep ISO at or below ISO \(Fmt.int(1400)) for clean pictures")
-        #expect(r.finding.contains("at ISO \(Fmt.int(9000)), the highest you used, the photo measures 29.6 dB"))
+        guard let r = CameraRules.noiseByISO(cam) else { Issue.record("rule did not fire"); return }
+        #expect(r.title == "Keep ISO at or below ISO 1400 for clean pictures")
+        #expect(r.finding.contains("at ISO 9000, the highest you used, the photo measures 29.6 dB"))
         #expect(!r.finding.contains("up to above"))
         #expect(r.exampleCaptions.first == "29.6 dB")
     }
 
     @Test func cleanEverywhereStatesTheHighestISOActuallyUsed() {
         let cam = isoCam([(50, Array(repeating: 38, count: 4)), (2500, Array(repeating: 36, count: 4))])
-        guard let r = CameraRules.isoCeiling(cam) else { Issue.record("rule did not fire"); return }
+        guard let r = CameraRules.noiseByISO(cam) else { Issue.record("rule did not fire"); return }
         #expect(r.title == "Noise is clean at every ISO you have used")
-        #expect(r.finding.contains("up to ISO \(Fmt.int(2500)), the highest"))
+        #expect(r.finding.contains("up to ISO 2500, the highest"))
     }
 
     @Test func isoExamplesComeOnlyFromCleanRows() {
@@ -229,7 +238,7 @@ struct DiscrepancyFixTests {
         var photos = cam.photos
         photos.append(Fx.photo(99) { $0.iso = 800; $0.snrMidgreyDB = 15; $0.snrMidgreyExtrapolated = true })
         cam = CameraGroup(model: "Test Cam", photos: photos)
-        guard let r = CameraRules.isoCeiling(cam) else { Issue.record("rule did not fire"); return }
+        guard let r = CameraRules.noiseByISO(cam) else { Issue.record("rule did not fire"); return }
         #expect(!r.exampleFiles.contains("p99.jpg"))
     }
 
@@ -241,7 +250,7 @@ struct DiscrepancyFixTests {
         #expect(r?.counted == 10)
         #expect(r?.total == 10)
         #expect(r?.countedText == "Counted: 10 of 10 photos")
-        let md = MarkdownExport.coaching(for: cam, insights: [r].compactMap { $0 })
+        let md = MarkdownExport.coaching(for: cam, output: CoachingEngine.output(for: cam))
         #expect(md.contains("_Counted: 10 of 10 photos._"))
         #expect(!md.contains("Based on"))
     }
@@ -374,7 +383,7 @@ struct DiscrepancyFixTests {
     @Test func strongSmoothingCardDropsKeepISOLow() {
         let r = CameraRules.noiseCharacter(Fx.camera { _, p in p.noiseWhiteness = 0.45 })
         #expect(r?.title == "Strong noise smoothing can soften fine texture")
-        #expect(r?.actions.contains { $0.contains("Keep ISO low") } == false)
+        #expect(r?.actionTexts.contains { $0.contains("Keep ISO low") } == false)
         #expect(r?.finding.contains("at higher ISO") == false)
         let moderate = CameraRules.noiseCharacter(Fx.camera { _, p in p.noiseWhiteness = 0.35 })
         #expect(moderate?.finding.contains("or scene texture") == true)
@@ -546,16 +555,17 @@ struct RepoResultsFixTests {
     @Test func coachingCardsMatchTheGatedData() throws {
         guard let lib = try library() else { return }
         let pro = try #require(lib.camera("iPhone 17 Pro Max"))
-        #expect(CameraRules.slowShutter(pro) == nil)
+        // 16 slow photos, only 1 with 3 usable edges: a Thin card under Needs more photos (spec §2 layer 4).
+        #expect(CameraRules.slowShutter(pro)?.grade == .thin)
         let lens = CameraRules.lensComparison(pro)
         #expect(lens?.finding.contains("front camera is") != true)
         #expect(lens?.evidence.contains { $0.metric.contains("front") } != true)
         let xr = try #require(lib.camera("iPhone XR"))
-        #expect(CameraRules.isoCeiling(xr)?.title != "Noise is clean at every ISO you have used")
+        #expect(CameraRules.noiseByISO(xr)?.title != "Noise is clean at every ISO you have used")
         let i13 = try #require(lib.camera("iPhone 13"))
-        #expect(CameraRules.isoCeiling(i13)?.title == "Keep ISO at or below ISO 160 for clean pictures")
+        #expect(CameraRules.noiseByISO(i13)?.title == "Noise does not follow ISO on this phone")
         let d850 = try #require(lib.camera("NIKON D850"))
-        #expect(CameraRules.isoCeiling(d850)?.title != "Noise is clean at every ISO you have used")
+        #expect(CameraRules.noiseByISO(d850)?.title != "Noise is clean at every ISO you have used")
         #expect(CameraRules.sharpeningCharacter(d850) == nil)
     }
 }

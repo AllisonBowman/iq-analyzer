@@ -8,6 +8,36 @@ enum Stats {
         return v.count % 2 == 1 ? v[mid] : (v[mid - 1] + v[mid]) / 2
     }
 
+    /// Linear-interpolated quantile (numpy's default), q in 0...1.
+    static func quantile(_ values: [Double], _ q: Double) -> Double? {
+        let v = values.filter { $0.isFinite }.sorted()
+        guard !v.isEmpty else { return nil }
+        let pos = q * Double(v.count - 1)
+        let lo = Int(pos.rounded(.down)), hi = Int(pos.rounded(.up))
+        return v[lo] + (v[hi] - v[lo]) * (pos - Double(lo))
+    }
+
+    /// The 95 % Wilson score interval for k successes in n trials (z = 1.96). n = 0 gives 0...1.
+    static func wilson(k: Int, n: Int, z: Double = 1.96) -> ClosedRange<Double> {
+        guard n > 0 else { return 0...1 }
+        let p = Double(k) / Double(n), nn = Double(n), z2 = z * z
+        let d = 1 + z2 / nn
+        let c = (p + z2 / (2 * nn)) / d
+        let h = z * ((p * (1 - p) / nn + z2 / (4 * nn * nn)).squareRoot()) / d
+        return max(0, c - h)...min(1, c + h)
+    }
+
+    /// Newcombe's hybrid score interval (method 10) for the difference p1 - p2 of two independent shares, where
+    /// p1 = k1/n1 and p2 = k2/n2. Callers pass the new photos as 1 and the baseline as 2, so the result is after - before.
+    static func newcombeDifference(k1: Int, n1: Int, k2: Int, n2: Int) -> (difference: Double, range: ClosedRange<Double>) {
+        let p1 = n1 > 0 ? Double(k1) / Double(n1) : 0, p2 = n2 > 0 ? Double(k2) / Double(n2) : 0
+        let w1 = wilson(k: k1, n: n1), w2 = wilson(k: k2, n: n2)
+        let d = p1 - p2
+        let lo = d - ((p1 - w1.lowerBound) * (p1 - w1.lowerBound) + (w2.upperBound - p2) * (w2.upperBound - p2)).squareRoot()
+        let hi = d + ((w1.upperBound - p1) * (w1.upperBound - p1) + (p2 - w2.lowerBound) * (p2 - w2.lowerBound)).squareRoot()
+        return (d, lo...hi)
+    }
+
     static func share(_ values: [Bool]) -> Double? {
         guard !values.isEmpty else { return nil }
         return Double(values.filter { $0 }.count) / Double(values.count)

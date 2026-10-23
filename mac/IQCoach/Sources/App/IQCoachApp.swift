@@ -13,11 +13,13 @@ struct IQCoachApp: App {
 
         Window("Glossary", id: "glossary") {
             GlossaryView()
+                .environment(model)
                 .frame(minWidth: 760, minHeight: 520)
         }
 
         Settings {
             SettingsView()
+                .environment(model)
         }
     }
 }

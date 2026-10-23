@@ -32,6 +32,15 @@ final class AppModel {
     var pickedPhotos: [PhotosPickerItem] = []
     static let maxPickedPhotos = 20
     var progress: AnalysisProgress?
+    /// The photographer's set-aside cards, intent tags, editor and checks.
+    let preferences: PreferencesStore
+
+    init(preferences: PreferencesStore = PreferencesStore()) {
+        self.preferences = preferences
+    }
+
+    /// The metric the Glossary window opens on (set by a popover's Open the Glossary button).
+    var glossaryMetric: Metric?
     private var analysisTask: Task<Void, Never>?
 
     static let defaultPython = "~/Developer/iq-analyzer/.venv/bin/python"
@@ -57,7 +66,10 @@ final class AppModel {
                 errorMessage = "\(url.lastPathComponent) has no photo rows. Choose the results.json that python -m iqa analyze wrote."
                 return
             }
-            library = PhotoLibrary(sourceName: url.lastPathComponent, photos: photos)
+            let written = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            let lib = PhotoLibrary(sourceName: url.lastPathComponent, photos: photos, sourceDate: written)
+            library = lib
+            preferences.ingest(lib)
             sidebarSelection = .library
             selectedPhotoID = nil
         } catch {

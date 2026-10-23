@@ -124,7 +124,12 @@ struct OverlayImage: View {
             guard p.clipHighPct != nil || p.clipLowPct != nil else { return "Clipping was not measured for this photo." }
             // The percentages are the analyzer's, over every pixel of the file; the red and blue areas are drawn on
             // the 800 px preview, in the file's own colours, so they show where, not exactly how much.
-            return "Red: blown in at least one colour channel; blue: crushed shadows. The areas are drawn on a \(loadPixel) px preview in the file's own colours, so they show where; the figures are the analyzer's, on the full-resolution file: \(Fmt.pct(p.clipHighPct ?? 0, 2)) blown, \(Fmt.pct(p.clipLowPct ?? 0, 2)) crushed."
+            var t = "Red: blown in at least one colour channel; blue: crushed shadows. The areas are drawn on a \(loadPixel) px preview in the file's own colours, so they show where; the figures are the analyzer's, on the full-resolution file: \(Fmt.pct(p.clipHighPct ?? 0, 2)) blown, \(Fmt.pct(p.clipLowPct ?? 0, 2)) crushed."
+            if let g = p.clipGamutPct, g >= 0.5 {
+                t += " A further \(Fmt.pct(g, 1)) of pixels hold colour beyond sRGB; the file keeps that colour, so it is not marked and is not lost detail."
+            }
+            if p.clipLowPct == 0 { t += " No pixel is crushed to pure black." }
+            return t
         case .focusMap:
             return Structure.focusCaption(p) ?? "Focus map needs a results file from iqa 0.2 or later."
         case .subject:

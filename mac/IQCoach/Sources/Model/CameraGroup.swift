@@ -42,6 +42,8 @@ struct CameraSummary: Sendable {
     let sharpnessRough: Int
     /// Photos with no valid edge.
     let sharpnessNone: Int
+    /// Middle half of the counted photos' sharpness (LW/PH), nil under `minRowsForFigure`.
+    let sharpnessIQR: ClosedRange<Double>?
     /// Median width of the per-photo p80 interval relative to the p80 figure, over counted photos.
     let p80RelativeWidthMedian: Double?
     let snr: Double?
@@ -56,6 +58,10 @@ struct CameraSummary: Sendable {
     let clipLowShare: Double?
     let clipHighCount: Int
     let clipLowCount: Int
+    /// Photos with more than 1 % of pixels in colour beyond sRGB (`clip_gamut_pct`): colour the file keeps, not lost detail.
+    let gamutCount: Int
+    /// Rows per file format ("jpeg", "heic", ...).
+    let formats: [String: Int]
     let whiteness: Double?
     /// Median whiteness over clean rows above ISO 160, where whiteness reflects noise reduction rather than
     /// low-noise texture (FINDINGS §5 item 5); nil when fewer than `minRowsForFigure` such rows exist.
@@ -74,6 +80,22 @@ struct CameraSummary: Sendable {
     let drExactMedian: Double?
     let firstDate: Date?
     let lastDate: Date?
+
+    /// Fewest clean photos an ISO band needs before its median is used.
+    static let minPerBand = 3
+    /// A band median may rise this much above the band below it and still count as following ISO (a design choice).
+    static let followsISOToleranceDB = 1.0
+
+    /// Bands with at least `minPerBand` clean photos.
+    var ratedBands: [SNRBandStat] { snrByBand.filter { $0.count >= Self.minPerBand } }
+
+    /// True when no band median rises more than 1 dB above the band below it (a sensor's behaviour); false when one
+    /// does (processing); nil with fewer than two rated bands.
+    var snrFollowsISO: Bool? {
+        let b = ratedBands
+        guard b.count >= 2 else { return nil }
+        return !zip(b, b.dropFirst()).contains { $1.median - $0.median > Self.followsISOToleranceDB }
+    }
 
     var hasSharpnessFigure: Bool { sharpnessCounted >= Self.minRowsForFigure && sharpnessLWPH != nil }
     var hasOvershootFigure: Bool { overshootCounted >= Self.minRowsForFigure && overshoot != nil }
@@ -94,6 +116,12 @@ struct CameraSummary: Sendable {
         sharpnessRough = photos.filter { (1...2).contains($0.edgesMeasured ?? 0) }.count
         sharpnessNone = photoCount - sharpnessCounted - sharpnessRough
         p80RelativeWidthMedian = Stats.median(sharp.compactMap(\.p80RelativeWidth))
+        let sv = sharp.compactMap(\.mtf50P80LWPH)
+        if sv.count >= Self.minRowsForFigure, let q1 = Stats.quantile(sv, 0.25), let q3 = Stats.quantile(sv, 0.75) {
+            sharpnessIQR = q1...q3
+        } else {
+            sharpnessIQR = nil
+        }
         let clean = photos.filter(\.snrIsClean)
         snr = Stats.median(clean.compactMap(\.snrMidgreyDB))
         snrCounted = clean.count
@@ -116,6 +144,8 @@ struct CameraSummary: Sendable {
         clipLowShare = Stats.share(lo.map { $0 > 1 })
         clipHighCount = hi.filter { $0 > 1 }.count
         clipLowCount = lo.filter { $0 > 1 }.count
+        gamutCount = photos.filter { ($0.clipGamutPct ?? 0) > 1 }.count
+        formats = Dictionary(grouping: photos, by: { $0.format ?? "unknown" }).mapValues(\.count)
         whiteness = Stats.median(photos.filter { $0.noiseTextureSuspect != true }.compactMap(\.noiseWhiteness))
         let above = clean.filter { ($0.iso ?? 0) > 160 }.compactMap(\.noiseWhiteness)
         whitenessAbove160Count = above.count
@@ -174,11 +204,34 @@ struct PhotoLibrary: Sendable {
     let sourceName: String
     let photos: [PhotoRecord]
     let cameras: [CameraGroup]
+    /// When the results file was written (its modification date), when known.
+    let sourceDate: Date?
 
-    init(sourceName: String, photos: [PhotoRecord]) {
+    init(sourceName: String, photos: [PhotoRecord], sourceDate: Date? = nil) {
         self.sourceName = sourceName
         self.photos = photos
+        self.sourceDate = sourceDate
         cameras = CameraGroup.groups(from: photos)
+    }
+
+    /// True when clipping was counted in each file's own encoding: only results written after that change (the fifth
+    /// run, FINDINGS §8) carry `clip_gamut_pct`.
+    var hasNativeClipping: Bool { photos.contains { $0.clipGamutPct != nil } }
+    /// True when the results carry the structure fields (iqa 0.2 and later).
+    var hasStructure: Bool { photos.contains(where: \.hasStructure) }
+
+    /// Cameras with enough photos for coaching, and those without.
+    var coachedCameras: [CameraGroup] { cameras.filter { $0.photos.count >= CameraRules.minPhotos } }
+    var sparseCameras: [CameraGroup] { cameras.filter { $0.photos.count < CameraRules.minPhotos } }
+
+    /// Median colourfulness over every photo: the reference for "a colourful picture".
+    var colorfulnessMedian: Double? { Stats.median(photos.compactMap(\.colorfulness)) }
+
+    /// "From results.json, written 23 Oct 2026 at 04:36 · 389 photos from 19 cameras."
+    var provenance: String {
+        var s = "From \(sourceName)"
+        if let d = sourceDate { s += ", written \(Fmt.date(d)) at \(d.formatted(date: .omitted, time: .shortened))" }
+        return s + " · \(Fmt.count(photos.count, "photo")) from \(Fmt.count(cameras.count, "camera"))"
     }
 
     func camera(_ model: String) -> CameraGroup? { cameras.first { $0.model == model } }
@@ -221,7 +274,11 @@ extension CameraSummary {
 
     var clipCaption: String? {
         guard let share = clipHighShare else { return nil }
-        return "Median share of pixels at the top of the range in at least one colour channel, counted in the file's own encoding. The band grades the typical photo; how often photos clip is graded by the 15 % line in the chart: \(Fmt.share(share)) of photos (\(clipHighCount)) lose more than 1 %."
+        var t = "Median share of pixels at the top of the range in at least one colour channel, counted in the file's own encoding. The band grades the typical photo; how often photos clip is graded by the 15 % line in the chart: \(Fmt.share(share)) of photos (\(clipHighCount)) lose more than 1 %."
+        if gamutCount > 0 {
+            t += " \(gamutCount) \(gamutCount == 1 ? "photo also has" : "photos also have") more than 1 % of pixels in colour sRGB cannot show; that colour is in the file, not lost detail."
+        }
+        return t
     }
 
     var overshootCaption: String {
@@ -256,6 +313,8 @@ extension CameraSummary {
         guard hasSharpnessFigure, let v = sharpnessLWPH, let c = sharpnessCPP else { return "\(Self.notEnoughText) (\(sharpnessCounted))" }
         return Metric.sharpnessLWPH.format(v) + (Metric.sharpnessCPP.band(for: c).map { " · \($0.word)" } ?? "")
     }
+    /// "1,966 LW/PH · Good (43)" or "Not enough photos (1)": the cell with the photos it rests on.
+    var sharpnessCellWithCount: String { hasSharpnessFigure ? "\(sharpnessCell) (\(sharpnessCounted))" : sharpnessCell }
     var noiseCell: String {
         guard hasSNRFigure, let v = snr else { return "\(Self.notEnoughText) (\(snrCounted))" }
         return Metric.snr.format(v) + (Metric.snr.band(for: v).map { " · \($0.word)" } ?? "")
