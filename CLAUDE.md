@@ -15,7 +15,23 @@ clear method notes with the ISO reference, and validation against ground truth o
 
 ## State of the project (as of 2026-10-15 09:30 ET)
 
-Done and validated (116 tests pass: `python3 -m pytest -q`):
+Done and validated (174 tests pass: `python3 -m pytest -q`; IQ Coach 286):
+- **The memory (2026-10-26; `docs/MEMORY-SPEC.md`, evidence in `docs/MEMORY-RESEARCH.md`).** `python -m iqa analyze
+  ... --memory DB` remembers every photo by the SHA-256 of its bytes plus the analyzer key
+  (`iqa.MEASUREMENT_VERSION`, enforced by `tests/test_memory_tripwire.py`: bump it, or re-pin after identical
+  outputs, whenever measurement code changes). One SQLite file (`iqa/memory_schema.sql`): a ledger kept for life
+  (about 530 B per photo), full records for the newest 500 photos per camera (the window the coach reads), details
+  under 8 MB, older records folded into monthly fixed-bin histograms with exact counts. Environmental failures are
+  never remembered; a real failure is final after two attempts. On the 93 earlier copies (50 distinct): first run
+  298 s, second run 2.2 s, all 93 remembered, no OpenCV/SciPy imported. IQ Coach reads the memory as its library,
+  skips known PhotoKit assets before any download, keeps no originals (staging is deleted per batch; previews live in
+  Caches under a budget that never evicts the window), and adds Resting/Dormant cameras, "this photo against your
+  usual" and the "What the coach remembers" Settings section. An adversarial review (5 reviewers, 21 of 22 findings
+  confirmed) and the research brief's final round (5 measured defects) were all fixed. Not built yet, with reasons:
+  MEMORY-SPEC.md section 9 (originals reservoir, writer lease, renditions, recovery ladder, capture-time fields).
+  Not exercised live: PhotoKit and picker imports against the real library, the Settings section in a running
+  window. The 444 MB of earlier copies in `~/Library/Application Support/IQCoach/photos` are untouched: Settings >
+  Import and Remove... measures them into the memory and deletes only what it then holds.
 - **A first adversarial review ran on this Mac** (`claude -p` with REVIEW_PROMPT.md, output in
   `REVIEW.md`, 12 min). It found 13 correctness issues and 13 methodology caveats. Fixed the same
   night, each pinned by a test in `tests/test_adversarial.py`: clipped plateaus now rejected
@@ -102,7 +118,7 @@ Not done yet:
 The morning run, the periodic-texture detector, `--no-paths` (the repo is public) and chart mode
 (ColorChecker dE00 + WB, e-SFR field map; synthetic validation only) are done, 2026-10-13.
 The bootstrap interval (her task 4) is done too; results.csv carries it. **IQ Coach**, the macOS
-coaching app, is built under `mac/IQCoach/` (spec `docs/APP-IQ-COACH-SPEC.md`; 189 Swift tests as of 2026-10-23, after the feedback layers of
+coaching app, is built under `mac/IQCoach/` (spec `docs/APP-IQ-COACH-SPEC.md`; 286 Swift tests as of 2026-10-26 with the memory, after the feedback layers of
 `docs/FEEDBACK-LAYERS-SPEC.md`: the one thing per camera, evidence words, set-aside and intent tags, capture checks,
 Markdown exports;
 `--snapshot` renders screens headless; `--window-shots` captures the live window but needs an awake

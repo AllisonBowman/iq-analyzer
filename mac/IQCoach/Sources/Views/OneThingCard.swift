@@ -10,6 +10,7 @@ struct OneThingCard: View {
     var setAside: ((Insight) -> Void)?
     var choosePhotos: (() -> Void)?
     @Environment(\.isSnapshot) private var isSnapshot
+    @Environment(AppModel.self) private var model: AppModel?
 
     var body: some View {
         Card {
@@ -77,6 +78,7 @@ struct OneThingCard: View {
             .padding(.top, 4)
         } else if let choosePhotos, camera.photos.count < EvidenceGrade.thinBelow {
             Button("Choose Photos to Analyze…", action: choosePhotos)
+                .disabled(model?.isBusy == true)
                 .padding(.top, 4)
         }
     }

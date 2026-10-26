@@ -2,13 +2,13 @@ import Foundation
 import ImageIO
 import Vision
 
-struct ContentLabel: Sendable, Hashable {
+struct ContentLabel: Sendable, Hashable, Codable {
     let label: String
     let confidence: Double
 }
 
 /// What Vision found in one photo. Recognised text strings are deliberately never kept.
-struct ContentSummary: Sendable, Hashable {
+struct ContentSummary: Sendable, Hashable, Codable {
     var available: Bool
     var reason: String?
     var labels: [ContentLabel] = []
@@ -34,36 +34,80 @@ struct ContentSummary: Sendable, Hashable {
     }
 }
 
-/// On-device content identification with Apple's Vision framework. No network. Results are cached per path.
+/// On-device content identification with Apple's Vision framework. No network. Results are cached per path in
+/// count-bounded NSCaches, and for a preview also on disk as `<sha>.vision.json`, so a remembered photo is read once.
 actor ContentIdentifier {
     static let shared = ContentIdentifier()
 
     static let minConfidence = 0.25
     static let maxLabels = 8
     static let longSide = 1600
+    static let summaryLimit = 2_000
+    static let labelLimit = 5_000
 
-    private var summaries: [String: ContentSummary] = [:]
-    private var labelCache: [String: [ContentLabel]] = [:]
+    private final class Box<T: Sendable>: Sendable {
+        let value: T
+        init(_ v: T) { value = v }
+    }
+
+    private let summaries: NSCache<NSString, Box<ContentSummary>> = {
+        let c = NSCache<NSString, Box<ContentSummary>>()
+        c.countLimit = ContentIdentifier.summaryLimit
+        return c
+    }()
+    private let labelCache: NSCache<NSString, Box<[ContentLabel]>> = {
+        let c = NSCache<NSString, Box<[ContentLabel]>>()
+        c.countLimit = ContentIdentifier.labelLimit
+        return c
+    }()
+    private let previews: PreviewStore
+
+    init(previews: PreviewStore = .shared) { self.previews = previews }
 
     /// Full identification. Never throws; failures come back as `available == false`.
     func summary(path: String) async -> ContentSummary {
-        if let hit = summaries[path] { return hit }
+        let key = path as NSString
+        if let hit = summaries.object(forKey: key) { return hit.value }
+        let stored = previews.files.sha(ofPreview: path).map(previews.files.vision)
+        if let stored, let s = Self.read(stored) { remember(s, key); return s }
+        if stored != nil, !FileManager.default.fileExists(atPath: path) { _ = await previews.rebuildIfPossible(path: path) }
         let result = await Task.detached(priority: .userInitiated) { Self.analyze(path: path, full: true) }.value
         if result.available {
-            summaries[path] = result
-            labelCache[path] = result.labels
+            remember(result, key)
+            if let stored { Self.write(result, to: stored) }
         }
         return result
     }
 
     /// Classification only (cheap), for the per-camera "What you photograph" row.
     func labels(path: String) async -> [ContentLabel]? {
-        if let hit = labelCache[path] { return hit }
-        if let full = summaries[path] { return full.labels }
+        let key = path as NSString
+        if let hit = labelCache.object(forKey: key) { return hit.value }
+        if let full = summaries.object(forKey: key) { return full.value.labels }
+        if let stored = previews.files.sha(ofPreview: path).map(previews.files.vision), let s = Self.read(stored) {
+            remember(s, key)
+            return s.labels
+        }
         let result = await Task.detached(priority: .utility) { Self.analyze(path: path, full: false) }.value
         guard result.available else { return nil }
-        labelCache[path] = result.labels
+        labelCache.setObject(Box(result.labels), forKey: key)
         return result.labels
+    }
+
+    private func remember(_ s: ContentSummary, _ key: NSString) {
+        summaries.setObject(Box(s), forKey: key)
+        labelCache.setObject(Box(s.labels), forKey: key)
+    }
+
+    nonisolated static func read(_ url: URL) -> ContentSummary? {
+        guard let data = try? Data(contentsOf: url), let s = try? JSONDecoder().decode(ContentSummary.self, from: data), s.available else { return nil }
+        return s
+    }
+
+    nonisolated static func write(_ s: ContentSummary, to url: URL) {
+        guard FileManager.default.fileExists(atPath: url.deletingLastPathComponent().path),
+              let data = try? JSONEncoder().encode(s) else { return }
+        try? data.write(to: url, options: .atomic)
     }
 
     // MARK: Work (runs off the actor)
