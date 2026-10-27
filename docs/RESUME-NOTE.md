@@ -41,8 +41,8 @@ findings are each pinned by a test (it also listed 13 methodology caveats, which
 
 Not yet safe: anything about chart mode on real charts (only validated on rendered charts); any
 "X dB better than Y" camera claim (the noise figures compare pipelines, not sensors; see
-results/FINDINGS.md section 1). Do not call the library data "benchmark" data; it is her own photos. Do not call the 389 "all" of
-her camera captures: they are the ones whose originals were stored on the Mac on 2026-10-13; the
+results/FINDINGS.md section 1). Do not call the library data "benchmark" data; it is his own photos. Do not call the 389 "all" of
+his camera captures: they are the ones whose originals were stored on the Mac on 2026-10-13; the
 library keeps most of its roughly 54,000 camera captures in iCloud.
 
 ## Which role this targets

@@ -32,10 +32,13 @@ struct AppCommands: Commands {
         CommandGroup(replacing: .newItem) {
             Button("Open Results…") { model.isImporting = true }
                 .keyboardShortcut("o", modifiers: .command)
+            // Not while an analysis is still stopping or the memory is compacted or forgotten.
             Button("Analyze Folder…") { model.isChoosingFolder = true }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
+                .disabled(model.isBusy)
             Button("Choose Photos to Analyze…") { model.isPickingPhotos = true }
                 .keyboardShortcut("p", modifiers: [.command, .shift])
+                .disabled(model.isBusy)
         }
         CommandGroup(replacing: .help) {
             Button("Glossary") { openWindow(id: "glossary") }

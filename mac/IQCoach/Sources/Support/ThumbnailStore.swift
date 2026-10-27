@@ -2,6 +2,8 @@ import SwiftUI
 import AppKit
 
 /// In-memory thumbnail cache in front of `ThumbnailLoader`, keyed by (path, maxPixel), with one load per key in flight.
+/// One NSCache bounded by bytes (cost = bytesPerRow x height) and by count; no strong dictionary holds the images,
+/// so the cache can evict them. An 800 px entry is about 1.9 MB, so a count limit alone allowed about 1.1 GB.
 actor ThumbnailStore {
     static let shared = ThumbnailStore()
 
@@ -11,24 +13,29 @@ actor ThumbnailStore {
     }
 
     static let capacity = 600
+    static let costLimit = 96 * 1024 * 1024
 
-    /// Thread-safe mirror of the cache so a view can show an already-loaded image on its first frame,
-    /// and so PNG snapshots can load synchronously.
-    nonisolated(unsafe) private static let mirror: NSCache<NSString, CGImage> = {
+    /// The bytes a decoded image holds, the cache cost.
+    nonisolated static func cost(bytesPerRow: Int, height: Int) -> Int { bytesPerRow * height }
+    nonisolated static func cost(of image: CGImage) -> Int { cost(bytesPerRow: image.bytesPerRow, height: image.height) }
+
+    /// The cache itself, readable from any thread (NSCache is thread-safe) so a view can show an already-loaded image
+    /// on its first frame, and so PNG snapshots can load synchronously.
+    nonisolated(unsafe) private static let cache: NSCache<NSString, CGImage> = {
         let c = NSCache<NSString, CGImage>()
         c.countLimit = capacity
+        c.totalCostLimit = costLimit
         return c
     }()
 
-    private var cache: [Key: CGImage] = [:]
     private var inflight: [Key: Task<CGImage?, Never>] = [:]
 
     nonisolated static func cached(path: String, maxPixel: Int) -> CGImage? {
-        mirror.object(forKey: "\(maxPixel)|\(path)" as NSString)
+        cache.object(forKey: "\(maxPixel)|\(path)" as NSString)
     }
 
     nonisolated static func store(_ image: CGImage, path: String, maxPixel: Int) {
-        mirror.setObject(image, forKey: "\(maxPixel)|\(path)" as NSString)
+        cache.setObject(image, forKey: "\(maxPixel)|\(path)" as NSString, cost: cost(of: image))
     }
 
     /// Synchronous load for PNG snapshots (the main thread, ImageIO directly).
@@ -41,18 +48,25 @@ actor ThumbnailStore {
 
     func image(path: String, maxPixel: Int) async -> CGImage? {
         let key = Key(path: path, maxPixel: maxPixel)
-        if let hit = cache[key] { return hit }
+        if let hit = Self.cached(path: path, maxPixel: maxPixel) { return hit }
         if let running = inflight[key] { return await running.value }
-        let task = Task<CGImage?, Never> { await ThumbnailLoader.load(path: path, maxPixel: maxPixel) }
+        let task = Task<CGImage?, Never> { await Self.load(path: path, maxPixel: maxPixel, previews: PreviewStore.shared) }
         inflight[key] = task
         let result = await task.value
         inflight[key] = nil
-        if let result {
-            if cache.count >= Self.capacity { cache.removeAll(keepingCapacity: true) }
-            cache[key] = result
-            Self.store(result, path: path, maxPixel: maxPixel)
-        }
+        if let result { Self.store(result, path: path, maxPixel: maxPixel) }
         return result
+    }
+
+    /// A missing preview is rebuilt first when the photo has a PhotoKit source; a shown preview is marked as used.
+    private static func load(path: String, maxPixel: Int, previews: PreviewStore) async -> CGImage? {
+        let isPreview = previews.files.sha(ofPreview: path) != nil
+        if isPreview, !FileManager.default.fileExists(atPath: path) {
+            guard await previews.rebuildIfPossible(path: path) else { return nil }
+        }
+        let img = await ThumbnailLoader.load(path: path, maxPixel: maxPixel)
+        if img != nil, isPreview { await previews.touch(path: path) }
+        return img
     }
 }
 

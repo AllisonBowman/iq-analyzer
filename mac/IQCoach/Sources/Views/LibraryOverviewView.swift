@@ -3,6 +3,8 @@ import SwiftUI
 struct LibraryOverviewView: View {
     let library: PhotoLibrary
     var prefs = UserPreferences()
+    /// The day camera freshness is measured to (fixtures pin it).
+    var now: Date = .now
     @Environment(AppModel.self) private var model: AppModel?
     @Environment(\.isSnapshot) private var isSnapshot
 
@@ -18,6 +20,10 @@ struct LibraryOverviewView: View {
                     Text("Library").font(.largeTitle.weight(.bold)).accessibilityAddTraits(.isHeader)
                     Text(library.provenance + ".")
                         .font(.callout).foregroundStyle(.secondary)
+                    if let older = PhotoLibrary.olderMethodText(library.olderMethodCount(current: model?.currentAnalyzerKey)) {
+                        Label(older, systemImage: "arrow.triangle.2.circlepath")
+                            .font(.callout).padding(.top, 4).fixedSize(horizontal: false, vertical: true)
+                    }
                     if let h = CoachingEngine.headline(for: library.cameras) {
                         Text(h).font(.title3).padding(.top, 8).fixedSize(horizontal: false, vertical: true)
                     }
@@ -48,13 +54,21 @@ struct LibraryOverviewView: View {
             VStack(alignment: .leading, spacing: 6) {
                 PhotoThumb(path: c.representativePhoto?.path, maxPixel: 400, cornerRadius: 8).frame(width: 160, height: 160)
                 Text(c.model).font(.callout.weight(.semibold)).lineLimit(1)
-                Text(Fmt.count(c.photos.count, "photo")).font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Text(Fmt.count(c.photos.count, "photo")).font(.caption).foregroundStyle(.secondary)
+                    if let tag = c.freshness(now: now)?.tag {
+                        Text(tag).font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 6).padding(.vertical, 1)
+                            .background(.fill.tertiary, in: Capsule())
+                            .help(CameraFreshness.banner(camera: c.model, lastDate: c.summary.lastDate, now: now) ?? "")
+                    }
+                }
             }
             .frame(width: 160, alignment: .leading)
         }
         .buttonStyle(.plain)
         .help("Open the \(c.model) report")
-        .accessibilityLabel("\(c.model), \(Fmt.count(c.photos.count, "photo"))")
+        .accessibilityLabel("\(c.model), \(Fmt.count(c.photos.count, "photo"))" + (c.freshness(now: now)?.tag.map { ", \($0)" } ?? ""))
         .accessibilityHint("Opens this camera's report")
     }
 

@@ -50,6 +50,16 @@ struct PhotoDetailView: View {
                 }
                 if !intents.isEmpty { intentCapsules }
             }
+            let usual = camera.map { UsualComparison.lines(for: photo, camera: $0) } ?? []
+            if !usual.isEmpty {
+                block("Against your other photos") {
+                    ForEach(usual) { u in
+                        Label(u.text, systemImage: Self.symbol(u.measure))
+                            .monospacedDigit()
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
             block("Do first") {
                 editorPicker
                 if a.nothingToFix {
@@ -161,6 +171,15 @@ struct PhotoDetailView: View {
             Section(title) { c() }
         } else {
             Section { c() }
+        }
+    }
+
+    private static func symbol(_ m: UsualComparison.Measure) -> String {
+        switch m {
+        case .highlights: "sun.max"
+        case .shadows: "moon"
+        case .snr: "waveform"
+        case .sharpness: "scope"
         }
     }
 

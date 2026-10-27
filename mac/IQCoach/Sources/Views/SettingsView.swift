@@ -31,6 +31,9 @@ struct SettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            if let model {
+                MemorySettingsSection(model: model)
+            }
             if let store = model?.preferences {
                 Section {
                     Button("Reset Preferences…") { confirmingReset = true }
@@ -62,7 +65,7 @@ struct SettingsView: View {
         let runner = AnalyzerRunner(python: pythonPath, repo: repoPath)
         Task {
             do {
-                result = try await runner.validate()
+                result = try await runner.validate().sentence
                 failed = false
             } catch {
                 result = error.localizedDescription
