@@ -4,7 +4,7 @@ The memory remembers every photo the analyzer has measured, by a fingerprint of 
 measured twice. Disk, RAM and CPU stay bounded as the library grows, and the coach advises from the photographer's
 recent work instead of from all of it.
 
-The evidence behind each choice (measured costs on this Mac, the hash benchmark on her own photos, and the cited
+The evidence behind each choice (measured costs on this Mac, the hash benchmark on his own photos, and the cited
 methods) is in `docs/MEMORY-RESEARCH.md`. The schema is `iqa/memory_schema.sql`, the single source of truth that both
 the analyzer and the app's tests execute.
 

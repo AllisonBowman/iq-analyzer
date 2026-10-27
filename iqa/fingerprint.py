@@ -2,7 +2,7 @@
 
 Advisory only, never an identity. The memory reuses a measurement only when the SHA-256 of the
 file's bytes matches (docs/MEMORY-SPEC.md section 3), because a perceptual match means "the same
-picture" precisely when the image-quality numbers differ: on her own photos a sigma-0.7 blur moved
+picture" precisely when the image-quality numbers differ: on his own photos a sigma-0.7 blur moved
 MTF50 by -18.5 % (median) while dHash stayed at distance 0-1, and burst frames taken 0.67 s apart
 hash alike. The hash is stored so near-duplicate and burst grouping can be built later.
 

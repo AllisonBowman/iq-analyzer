@@ -61,13 +61,13 @@ writing against the Python writer [L14] (§3.14). A claim the final round change
    - Cache misses are streamed into staging, hashed while streaming, measured and deleted. The 443.8 MB of copies at rest and the 43 byte-identical copies (196.6 MB) go [L9].
    - Up to 64 originals per Active camera, sampled uniformly from its window, stay in `Caches/IQCoach/reservoir`: ≤ 256 MB per camera, ≤ 1 GB in total, discardable and excluded from backup [165][31].
    - Why [L10]:
-     - 53,210 of her 53,257 captures (99.9 %) are cloud-only.
+     - 53,210 of his 53,257 captures (99.9 %) are cloud-only.
      - Photos keeps an app-downloaded original only until its next space-driven sweep (72 h to 86 days).
      - 6 of the last 10 analyzer transitions needed pixels. Without the reservoir, one such bump costs 3.94 GB of downloads to restore the 4 Active cameras' windows.
    - Measured cost: 957 MB for today's 4 Active cameras. A bump then costs 0 downloads and about 8.5 CPU-minutes, and coaching resumes at n = 64 at once.
 4. **New photos are measured on arrival, and downloads spend a per-day budget set by the network path.**
    - The change feed drives analysis while Photos still holds a new capture locally: 29 of the newest 40 were local at IQ Coach's own 10-15 import [L10].
-   - On an unmetered path: up to 500 photos and 2 GB a day. On an expensive or constrained path (`NWPath`): nothing [163][164]. Never more than about 1 % of free space a day, because downloaded originals stay inside her Photos library until the next sweep.
+   - On an unmetered path: up to 500 photos and 2 GB a day. On an expensive or constrained path (`NWPath`): nothing [163][164]. Never more than about 1 % of free space a day, because downloaded originals stay inside his Photos library until the next sweep.
    - A restore starts only after the analyzer key has been stable for 12 h.
 5. **One SQLite file in WAL mode, `memory.sqlite` in Application Support, with one batch at a time per machine.**
    - The Python package owns the schema. The Python worker writes measurements; the app writes only its own tables and the source statuses it decides before any bytes move.
@@ -103,11 +103,11 @@ writing against the Python writer [L14] (§3.14). A claim the final round change
     - Today's working tree cached a FileNotFoundError from a swept staging file as `failed` in 2 of 2 real runs [L13].
 11. **Near-duplicates are advisory only, and capture links are exact** (**Corrected**).
     - Each capture counts once, through exact links in this order: SHA-256 equality, a linked identifier, then a capture_id (make, model, `DateTimeOriginal`, `SubSecTimeOriginal`, `OffsetTimeOriginal`, plus Apple `PhotoIdentifier` or the Nikon serial and image number).
-    - dHash256 ≤ 24 only breaks ties between tone edits. It linked 18 of 1,000 real crop geometries from her own edits [L11]. Its zero-error window (23–27) rests on 23 burst pairs, so the 95 % upper bound on false burst merges is about 13 % [L8][162].
+    - dHash256 ≤ 24 only breaks ties between tone edits. It linked 18 of 1,000 real crop geometries from his own edits [L11]. Its zero-error window (23–27) rests on 23 burst pairs, so the 95 % upper bound on false burst merges is about 13 % [L8][162].
     - Burst ID, capture-time window and a Vision revision-2 print (same scene at ≤ 0.50) group photos for advice. Burst siblings are always measured: they differ in exactly the sharpness the coach reports.
 12. **Only original renditions feed the coach** (new).
     - A `rendition` column (original / edited / unknown / external_edit). Camera aggregates, percentiles and capture checks read `original`, and `unknown` only when its area is a native size seen for that model, its `Software` is the camera's own and it is not a Portrait.
-    - Measured on her library [L11]: 48 captures fail today's 5 MP gate only because they were cropped; 959 Lightroom saves of 5 MP or more sit in Photos as unedited originals with camera EXIF.
+    - Measured on his library [L11]: 48 captures fail today's 5 MP gate only because they were cropped; 959 Lightroom saves of 5 MP or more sit in Photos as unedited originals with camera EXIF.
     - Edited and external-edit photos are measured for their own screen and labelled "includes your edits".
 13. **Damage and a full disk have a recovery ladder, not "start fresh"** (new) [L13].
     - Damage is declared only from a fresh connection under the batch lease, on `SQLITE_CORRUPT`/`SQLITE_NOTADB` or `quick_check` ≠ ok. An open reader saw `SQLITE_CORRUPT` on a file that passed `integrity_check`. On a full APFS volume SQLite reported FULL, IOERR and CANTOPEN, and "start fresh" would have renamed a healthy memory and then failed to create one.
@@ -141,7 +141,7 @@ writing against the Python writer [L14] (§3.14). A claim the final round change
 - **The capture gate and the signature read the edited size** [L11][R]:
   - `PhotosImporter` gates on `PHAsset.pixelWidth × pixelHeight` (working tree L128). Apple documents that size as the current, edited version's [171].
   - 48 real captures with 8–20 MP originals fall below 5 MP only because they were cropped (median kept area 20 %). Today they are skipped on every run without being remembered; the draft's S1 would have written `not_capture` for them for good.
-  - The signature (L133-134) is built from the same asset size, so it changes on every one of the 437 geometric edits in her library and a known edited asset is downloaded again.
+  - The signature (L133-134) is built from the same asset size, so it changes on every one of the 437 geometric edits in his library and a known edited asset is downloaded again.
 - **Capture time** [R]:
   - `iqa/imageio.py` reads only `DateTimeOriginal`. Without it, it falls back to tag 306 `DateTime` (L99-111, L157), which is a modification time.
   - `results.json` carries no sub-second time and no offset.
@@ -265,7 +265,7 @@ Each property has a test in §6.3, where "T" numbers refer to that table.
 - **Perceptual hashes on these files** [L1][L8]:
   - Burst frames 0.67 s apart had aHash 0, pHash64 0 and dHash64 4.
   - Only **dHash256** has a threshold with zero errors that also separates burst siblings: copies reach at most 23 bits (worst case a 1 %-per-side crop), cropped burst siblings start at 28, unrelated photos at 58, so T = 23–27 works on this set.
-  - **Corrected (scope).** The set is 50 photos, 4 of them HEIC, with only 23 burst pairs. Zero errors in 23 pairs bounds the false burst-merge rate below about 13 % (95 %, rule of three [162]). The benign variants were re-encodes, resizes and crops of at most 1 % per side, not Photos edits. Against her own 1,000 real crop geometries, dHash256 ≤ 24 linked only 18 (§3.11).
+  - **Corrected (scope).** The set is 50 photos, 4 of them HEIC, with only 23 burst pairs. Zero errors in 23 pairs bounds the false burst-merge rate below about 13 % (95 %, rule of three [162]). The benign variants were re-encodes, resizes and crops of at most 1 % per side, not Photos edits. Against his own 1,000 real crop geometries, dHash256 ≤ 24 linked only 18 (§3.11).
   - pHash256 has no such window: same-photo copies reach 34 bits while burst siblings start at 24.
   - aHash falsely matched 1.02 % of unrelated pairs at ≤ 10.
   - PDQ at its standard threshold of ≤ 31 [88] caught 0 of 51 pairs taken within 60 s, and a 10 % crop moved it by a median of 88 bits.
@@ -308,7 +308,7 @@ Each property has a test in §6.3, where "T" numbers refer to that table.
   - `requestData(for:options:dataReceivedHandler:)` streams chunks on a serial queue [13], so the app can hash while writing.
 - **iCloud.** Request with `isNetworkAccessAllowed = false` first, and treat error 3164 (network access required) as "cloud-only, deferred" [12][157][158][159].
   - With Optimize Storage only "space-saving versions" are local [36], and the library "is optimized only when you need space, starting with the photos and videos you access least" [160][161].
-  - **Answered** (draft: UNVERIFIED) [L10]: Photos keeps an app-downloaded original until its next space-driven sweep. All 13 on-demand downloads of 10-15 stayed local 72.3–72.8 h, until one sweep freed 18.8 GB. Across 787 pruned on-demand downloads, residency ran 72–2,074 h (median 86 days). App downloads got no protection. So a download grows her Photos library by its bytes until the next sweep.
+  - **Answered** (draft: UNVERIFIED) [L10]: Photos keeps an app-downloaded original until its next space-driven sweep. All 13 on-demand downloads of 10-15 stayed local 72.3–72.8 h, until one sweep freed 18.8 GB. Across 787 pruned on-demand downloads, residency ran 72–2,074 h (median 86 days). App downloads got no protection. So a download grows his Photos library by its bytes until the next sweep.
   - Download latency: median 0.555 s for 2.3–7.9 MB, fitted as t ≈ 0.52 s + MB / 130 MB/s; per-request latency dominates.
 - **Thumbnails cost the app no disk** through `PHCachingImageManager` [23][24], for grids.
   - Grids: `.opportunistic`, `.fast`, network off. A low-resolution derivative is acceptable there.
@@ -416,9 +416,9 @@ Each property has a test in §6.3, where "T" numbers refer to that table.
 ### 3.5 Coaching: what to remember and how memory shapes advice
 **Decision supported:**
 - remember habits, not photos;
-- compare her only with her own recent work;
+- compare him only with his own recent work;
 - set landmarks in advance;
-- bring a card back only when her behaviour changes;
+- bring a card back only when his behaviour changes;
 - show what the coach remembers.
 
 - **Feedback research.**
@@ -578,7 +578,7 @@ The local share of the newest 400 swings with prune sweeps: 66 % (10-01), 71.5 %
 - IQ Coach's own import of the newest 40 at 2026-10-15 00:05 EDT: 29 local, cloned by `writeData` in a median 4.2 ms (max 7 ms); 11 downloaded sequentially in 0.477–0.676 s each (median 0.555 s, 11.3 MB/s aggregate). Fit: t ≈ 0.52 s + MB / 130 MB/s. Picker, 10-23: 0.53–0.77 s per file.
 - Eleven minutes later all 40 were local; the re-export took 2.1 ms per file.
 - The 13 on-demand downloads of 10-15 survived until one library-wide sweep at 2026-10-18 00:18–00:52, 72.3–72.8 h later. That sweep freed 18.8 GB: 1,081 photo originals (2.39 GB), 265 Live Photo videos (1.12 GB) and 21,229 derivatives (13.8 GB). Across all 787 pruned on-demand downloads, residency ran 72–2,074 h, median 86 days.
-- The 10-23 picker run added exactly its 6 originals (27.5 MB, byte-identical) to the library's `originals/`. A download therefore grows her Photos library until the next sweep.
+- The 10-23 picker run added exactly its 6 originals (27.5 MB, byte-identical) to the library's `originals/`. A download therefore grows his Photos library until the next sweep.
 
 **Byte stability.**
 - The Photos database holds iCloud's own content fingerprint for every original: `ZINTERNALRESOURCE.ZFINGERPRINT` = `0x01 ‖ SHA-1(salt ‖ bytes)`, found by testing and verified on 124 files. No public documentation describes it.
@@ -627,14 +627,14 @@ The local share of the newest 400 swings with prune sweeps: 66 % (10-01), 71.5 %
 ### 3.11 Edited photos, picker renditions, and the capture gate [L11]
 **Decision supported:** a rendition flag on every content row, the picker routed to PhotoKit when authorized, the capture gate on the `.photo` resource size, exact capture links.
 
-**Not run:** the on-device matrix (picker × encoding policy × four authorization states × prepared edits). It needs a person picking photos, a disposable library and changes to an app's Photos privacy state. Switching her System Photo Library turns off iCloud Photos, and turning it back on merges libraries irreversibly [180], so the protocol uses a separate macOS user account (§6.2). Privacy-state changes are hers to make. A harness, `PickerProbe.app`, is built.
+**Not run:** the on-device matrix (picker × encoding policy × four authorization states × prepared edits). It needs a person picking photos, a disposable library and changes to an app's Photos privacy state. Switching his System Photo Library turns off iCloud Photos, and turning it back on merges libraries irreversibly [180], so the protocol uses a separate macOS user account (§6.2). Privacy-state changes are his to make. A harness, `PickerProbe.app`, is built.
 
-**Run, read-only:** the 13 picker deliveries already on disk; a copy-on-write clone of `Photos.sqlite` (7.3 GB, 0 extra bytes) and the library's 3,974 adjustment plists; a dHash256 simulation on the 50 distinct photos with 1,000 real crop geometries taken from her own edits.
+**Run, read-only:** the 13 picker deliveries already on disk; a copy-on-write clone of `Photos.sqlite` (7.3 GB, 0 extra bytes) and the library's 3,974 adjustment plists; a dHash256 simulation on the 50 distinct photos with 1,000 real crop geometries taken from his own edits.
 
 **A. Unedited picks under `.current` delivered the original bytes, 13 of 13.** 8 are SHA-256-identical to the original (three match PhotoKit `.photo` exports, five match the library's own files, one a depth-captured HEIC with no effect applied); the other 5 have exactly the original's byte count, one of them the JPEG half of a D850 RAW+JPEG pair. All 13 carry `DateTimeOriginal`, `SubSecTimeOriginal` and `OffsetTimeOriginal`; the 11 iPhone files also carry MakerNote `PhotoIdentifier` (tag 0x002b [51]), the 2 D850 files do not. No edited asset has been picked, so FB9706029 [169] is untested on macOS 26.
 
-**B. Edits in her library.**
-- 66,268 stills; 705 adjusted (654 by her, 51 by the camera), 1.06 %; 549 of the 56,776 stills with an original of 5 MP or more.
+**B. Edits in his library.**
+- 66,268 stills; 705 adjusted (654 by him, 51 by the camera), 1.06 %; 549 of the 56,776 stills with an original of 5 MP or more.
 - Newest 500 captures: 11 adjusted (2.2 %), 10 of them Portraits whose depth effect the camera applied.
 - Crops: 391 stills; the median crop keeps 44 % of the area (p10 23 %, p90 75 %); 80 also straighten (median 2.6°). 437 of the 705 edits changed the pixel area.
 - All 705 adjusted stills keep a separate full-size render whose area equals the current size (437 of 437 geometric edits), and the original resource keeps the original area (705 of 705): the database counterpart of `.photo` versus `.fullSizePhoto` [1].
@@ -708,7 +708,7 @@ The local share of the newest 400 swings with prune sweeps: 66 % (10-01), 71.5 %
 | Second app instance | runs a full import | viewer, exits 75, 12/12 |
 | Final change token | T2 in 12/12, although A's batch was destroyed | T1 (T2 left for the next run) |
 
-With the real analyzer on her photos, the naive run (done twice) deleted A's batch at 3.0–3.2 s; A's in-flight `IMG_5004.jpeg` raised FileNotFoundError and was stored as **`failed` in both runs**, so B and C skipped a good photo as a remembered failure. The robust run: 6 analyses, 0 duplicates, 0 `failed`; C waited 337 s for the lease. An uncontended `flock` costs 1.7 µs (p99 9.4 µs) and is free within 245 µs of SIGKILL [195]. A child started with Foundation `Process` inherited no descriptors ≥ 3, so the analyzer child takes its own locks. A lease row in `meta` is worse: it needs a database write (which fails on a full disk) and outlives a crash.
+With the real analyzer on his photos, the naive run (done twice) deleted A's batch at 3.0–3.2 s; A's in-flight `IMG_5004.jpeg` raised FileNotFoundError and was stored as **`failed` in both runs**, so B and C skipped a good photo as a remembered failure. The robust run: 6 analyses, 0 duplicates, 0 `failed`; C waited 337 s for the lease. An uncontended `flock` costs 1.7 µs (p99 9.4 µs) and is free within 245 µs of SIGKILL [195]. A child started with Foundation `Process` inherited no descriptors ≥ 3, so the analyzer child takes its own locks. A lease row in `meta` is worse: it needs a database write (which fails on a full disk) and outlives a crash.
 
 **Damage, on copies of a 54,000-photo memory** (54,000 assets, 56,123 sources, 5,693 window rows, 204 archive buckets; 63.2 MB, 46.7 MB compacted):
 
@@ -1056,7 +1056,7 @@ Kish n_eff uses per-day counts for Σw².
 
 | Tier | Location | Unit size (measured) | What is kept | Budget | Eviction |
 |---|---|---|---|---|---|
-| **Originals (staging)** | `Caches/IQCoach/staging/<pid>-<random>/` with a locked `.owner` | 4.77 MB mean, 15.5 MB max among her copies; 9.67 MB library mean [L2][L10] | Only in flight | ≤ 2 files per worker, ≤ 2 workers per machine, ≤ 128 MB, and never below the free-space reserve | Deleted after commit, or moved into the reservoir; owner-aware sweep (§4.9) |
+| **Originals (staging)** | `Caches/IQCoach/staging/<pid>-<random>/` with a locked `.owner` | 4.77 MB mean, 15.5 MB max among his copies; 9.67 MB library mean [L2][L10] | Only in flight | ≤ 2 files per worker, ≤ 2 workers per machine, ≤ 128 MB, and never below the free-space reserve | Deleted after commit, or moved into the reservoir; owner-aware sweep (§4.9) |
 | **Re-measure reservoir** (new; **Corrected** from "0 at rest") | `Caches/IQCoach/reservoir` ("discardable cache files" [165]), marked excluded from backup [31] | 270 / 152 / 150 / 385 MB per Active camera today [L10] | 64 originals per Active camera, a uniform sample of its window (Algorithm R [111]) | ≤ 256 MB per camera (about 16 D850 photos), **≤ 1 GB in total** (957 MB for today's 4 Active cameras) | Algorithm R replacement as the window moves; released when a camera turns Resting; purgeable by Clear cache or the system, after which a `pixel` bump costs downloads |
 | **Ledger** (`content`, `source`, `era`) | memory.sqlite | **338–341 B per photo**, lean layout, incremental [L12] | Every live content: pinned, or with any source not `deleted`. Tombstones (all sources deleted): the newest 10,000 | **18.3 MB at 54,000 photos, 37.5 MB at 110,000.** Tripwire 512 B × (n_reachable + 10,000): 32.8 MB at 54k, reported in Settings, never enforced on live rows | Tombstones beyond the newest 10,000, oldest deletion first, by count. Then `VACUUM` when in-page slack (`dbstat` unused) exceeds 25 % of the file (0.41 s at 130k rows; needs 2× the file free) [L12] |
 | **Window** (`summary` + `detail` + `ring`) | memory.sqlite | 414 + 496 B mean (detail max 2,288 B) [L7][L4] | 500 newest per Active camera, 64 per Resting camera, pinned (intent tags, check baselines, burst keepers), viewed in the last 30 days | Expected ≤ 9 MB (19 cameras × 500 × 910 B); **hard cap 32 MB** | Oldest captured, unpinned first. Then a fully stepped `incremental_vacuum` (57 ms for 29 MB [L4]) |
@@ -1076,8 +1076,8 @@ Kish n_eff uses per-day counts for Σw².
 
 **Download and restore budget** (**Corrected** from "20 photos or 100 MB per session") [L10]:
 - Background spending is per day and set by the network path [163][164]: on an unmetered path up to 500 photos and 2 GB a day with 2 workers; nothing when `NWPath.isExpensive` or `isConstrained` is set.
-- Never more than about 1 % of free space a day, read from `volumeAvailableCapacityForOpportunisticUsage` (0 or nil means unknown, so spend nothing) [33][166], because downloaded originals stay inside her Photos library until the next sweep.
-- A batch she starts may use important-usage capacity, still above the free-space reserve.
+- Never more than about 1 % of free space a day, read from `volumeAvailableCapacityForOpportunisticUsage` (0 or nil means unknown, so spend nothing) [33][166], because downloaded originals stay inside his Photos library until the next sweep.
+- A batch he starts may use important-usage capacity, still above the free-space reserve.
 - Free-space reserve: max(64 MB, 3 × the largest original + 2 × `journal_size_limit`), re-checked before each download and each photo; below it the batch stops. APFS returned ENOSPC with 6.4–6.9 MB still reported free [L13].
 - Result: a full Active restore (1,296 photos, 3.94 GB) takes about 3 days instead of 65 sessions, and with the reservoir it is no longer on the critical path.
 - These limits are judgement (risk 14).
@@ -1166,9 +1166,9 @@ Kish n_eff uses per-day counts for Σw².
 |---|---|---|---|
 | **This photo vs your usual** ("more blown highlights than 95 % of your recent iPhone 17 Pro Max photos, 2.2 % of the frame") | Mid-rank percentile in the camera's decayed histogram of original renditions | Only at p ≤ 10 or ≥ 90, with n_eff ≥ 20. "Softer than usual" only when the photo's `mtf50_median_ci_hi_cpp` is below the camera's p10 (per-image CI about ±30 %) | [L5][132] |
 | **The one thing**, recent-weighted | Decayed share counters plus the Wilson interval on n_eff | Existing severity, evidence-word and 10 %-prevalence gates [R]. The action is written as an if-then sentence | [138] |
-| **Since <landmark>** | Buckets on either side of a pre-registered date | Only landmarks fixed in advance: a check's start, the first photo from a new camera, or a landmark she declares. **Never search for a split date** (measured trap, §3.5) | [139][L5] |
+| **Since <landmark>** | Buckets on either side of a pre-registered date | Only landmarks fixed in advance: a check's start, the first photo from a new camera, or a landmark he declares. **Never search for a split date** (measured trap, §3.5) | [139][L5] |
 | **Check follow-ups** | Collapsed check record plus buckets | "Still holding: k of n" at +30 and +66 days after "It worked", then silence | [137][155][156] |
-| **Burst siblings** | B0/B1 groups plus pixel counts (clipping) | Highlight advice applies in 11 of 35 ten-second groups on the 17 Pro Max. **Never "sharpest" from natural-edge MTF50** when the ratio is inside the CI band. The keeper is her `userPick` | [16][L5] |
+| **Burst siblings** | B0/B1 groups plus pixel counts (clipping) | Highlight advice applies in 11 of 35 ten-second groups on the 17 Pro Max. **Never "sharpest" from natural-edge MTF50** when the ratio is inside the CI band. The keeper is his `userPick` | [16][L5] |
 | **Set-aside card returns** | Snapshot {share, n_eff, severity, grade, date} | Returns only if the Newcombe interval of (current − snapshot) excludes 0 **and** the change is ≥ 10 points, or the severity word changes. At most once per 30 days. Replaces the 25 %-growth rule | [141][R] |
 | **Typical vs your best** | Decayed median, plus p90 as a target | Report a gap only above a stated noticeability unit; label it Moderate | [146][149] |
 | **N more photos make this firm** | Current decayed hits/n | Smallest extra n at which the Wilson interval clears the rule's line | [122] |
@@ -1276,7 +1276,7 @@ On-device processing counts as "not collected" under Apple's App Privacy definit
 2. **`localIdentifier` stability** after migration or repair (UNVERIFIED [6][7]). A change only causes a miss, which is safe. Without a cloud alias, recovery costs a download plus a hash per photo as it is presented, never a re-measure, as long as the content row survives [L12].
 3. **Retention window of the persistent change history** (undocumented [11]). The 3105 fallback reconciles. Under limited access the feed covers only the selected assets [11]; whether macOS ever grants `.limited` is UNVERIFIED (§3.2).
 4. **The picker:** whether `itemIdentifier` is set without authorization (the documentation and DTS disagree [18][19]), and whether an edited pick under `.current` delivers the adjusted rendition on macOS 26 (FB9706029 [169]; no edited asset has been picked). The design no longer depends on either: an authorized pick takes the PhotoKit path, and any other pick is hashed and labelled `unknown`.
-5. **Downloads grow her Photos library.** Answered [L10]: a downloaded original stays in the library until the next space-driven sweep (72 h to 86 days observed), and the 10-23 picker run added exactly its 27.5 MB. The per-day budget and the 1 %-of-free-space rule bound the effect.
+5. **Downloads grow his Photos library.** Answered [L10]: a downloaded original stays in the library until the next space-driven sweep (72 h to 86 days observed), and the 10-23 picker run added exactly its 27.5 MB. The per-day budget and the 1 %-of-free-space rule bound the effect.
 6. **Capture time.** Corrected (§4.7): iqa reads only `DateTimeOriginal` and falls back to tag 306, a modification time. Still open: a date adjusted in Photos may change `PHAsset.creationDate` but not the original's EXIF (UNVERIFIED; publicspace.net reports that originals keep their EXIF [181]). Decay uses EXIF, consistent with the measurement; record both.
 7. **Vision print stability** across Macs and OS updates within revision 2 (UNVERIFIED; one machine). Store the revision and recompute on mismatch. Prints are advisory only.
 8. **dHash256.** The 23–27 window comes from 50 photos (4 HEIC) and 23 burst pairs: the 95 % upper bound on false burst merges is about 13 %. It does not survive real crops (18 of 1,000 linked). It no longer decides any link on its own; re-measure the window on a burst-rich, HEIC-heavy sample before relying on it even as a tiebreaker.
@@ -1311,8 +1311,8 @@ On-device processing counts as "not collected" under Apple's App Privacy definit
 
 The research sessions could not run PhotoKit: TCC returned "denied" or "notDetermined" for every binary they started, and granting Photos access, changing an app's privacy state or creating a macOS user are Allison's decisions. Three read-only probes are built; the `/tmp` paths do not survive a reboot, so copy them first.
 - **AvailProbe** [L10] (`/tmp/claude-501/icloudcost/probe/AvailProbe.app`, source `main.swift`). Launched by Allison so that TCC asks about the probe itself: `open -W …/AvailProbe.app --args census <out>/census.json`, then `download 50 <out.json>` (a 60 s re-check and a second download for SHA-256 are built in), and `recheck <in> <out>` after 24 h. It re-measures availability, download latency, retention and byte stability through PhotoKit.
-- **PickerProbe** [L11] (`…/scratchpad/edits/PickerProbe/`). Run in a separate macOS user account without iCloud, never by switching her System Photo Library [180]. Import copies of an iPhone JPEG and HEIC, a D850 NEF+JPEG pair and a Portrait HEIC; duplicate one asset per edit (crops keeping 90 % and 40 %, Exposure +1, Adjust Date & Time, Adjust Location, an edit then Revert, Use RAW as Original, Portrait on and off). Run it with full access before and after the edits, then in each authorization state (notDetermined via `tccutil reset Photos dev.iqcoach.pickerprobe` without pressing Request; denied; limited if offered; full). Each row records the picker deliveries for `.current` and `.automatic` with and without a library, as `Data` and `FileRepresentation`; `itemIdentifier` and the fetch count; `.photo`, `.fullSizePhoto`, `.alternatePhoto` and `.adjustmentBasePhoto` hashes; asset size against `.photo` resource size; `hasAdjustments`, `adjustmentsState`, `adjustmentTimestamp` [173][174]; and the capture tags. Score with `dhash_pairs.py probe.jsonl`.
-- **idprobe** [L12] (`…/scratchpad/ledger/idprobe`). With her consent: `idprobe 1000 out.json --request-access`. It reports identifier length statistics and shapes (never an identifier), mapping errors, the time of one batched call, whether a second call returns the same strings, and a 50-item round trip.
+- **PickerProbe** [L11] (`…/scratchpad/edits/PickerProbe/`). Run in a separate macOS user account without iCloud, never by switching his System Photo Library [180]. Import copies of an iPhone JPEG and HEIC, a D850 NEF+JPEG pair and a Portrait HEIC; duplicate one asset per edit (crops keeping 90 % and 40 %, Exposure +1, Adjust Date & Time, Adjust Location, an edit then Revert, Use RAW as Original, Portrait on and off). Run it with full access before and after the edits, then in each authorization state (notDetermined via `tccutil reset Photos dev.iqcoach.pickerprobe` without pressing Request; denied; limited if offered; full). Each row records the picker deliveries for `.current` and `.automatic` with and without a library, as `Data` and `FileRepresentation`; `itemIdentifier` and the fetch count; `.photo`, `.fullSizePhoto`, `.alternatePhoto` and `.adjustmentBasePhoto` hashes; asset size against `.photo` resource size; `hasAdjustments`, `adjustmentsState`, `adjustmentTimestamp` [173][174]; and the capture tags. Score with `dhash_pairs.py probe.jsonl`.
+- **idprobe** [L12] (`…/scratchpad/ledger/idprobe`). With his consent: `idprobe 1000 out.json --request-access`. It reports identifier length statistics and shapes (never an identifier), mapping errors, the time of one batched call, whether a second call returns the same strings, and a 50-item round trip.
 - **The real app binary**: `open -n` plus the binary with `--analyze-photos 5` plus the CLI (T23).
 - Itemised PhotoKit costs (risk 11), thumbnails and overlays for cloud-only assets (risk 18), `volumeAvailableCapacity*` in the signed app (risk 12), and `requestData` streaming plus hashing throughput on a cold cache.
 

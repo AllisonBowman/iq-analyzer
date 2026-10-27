@@ -12,8 +12,8 @@ can run the analyzer itself on a folder or on photos picked from the Photos libr
 "I shot these photos on this camera. Tell me what it does well and badly, what to change when I
 shoot, and what to do in my editing app to get the best out of each photo." The user is a
 photographer, not an engineer. Each camera screen therefore opens with the one change most worth
-making, says how sure that is in a word and a photo count, and lets her answer back ("that is
-intended") or start a check that measures her next photos against a frozen baseline. Every number on
+making, says how sure that is in a word and a photo count, and lets him answer back ("that is
+intended") or start a check that measures his next photos against a frozen baseline. Every number on
 screen carries its qualifier ("at least", "43 of 206", "1 edge"), and every number comes from the
 results file with its count; the app never invents a statistic.
 

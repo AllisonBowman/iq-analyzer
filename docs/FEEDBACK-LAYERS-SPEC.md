@@ -32,7 +32,7 @@ The rendered screens in `/tmp/iqcoach-snaps5` (01:30) predate the fifth run. The
 
 Each camera screen opens with the one change most worth making. Next to it are a word and a photo count for how sure that is, and every number on screen carries its qualifier ("at least", "43 of 206", "1 edge").
 
-The photographer can answer back ("that is intended", "dark on purpose"). She can also start a check that measures her next photos against a baseline frozen at the start. A rule she can read, set in advance, decides whether the change worked or whether it is too early to tell.
+The photographer can answer back ("that is intended", "dark on purpose"). He can also start a check that measures his next photos against a baseline frozen at the start. A rule he can read, set in advance, decides whether the change worked or whether it is too early to tell.
 
 ---
 
@@ -52,7 +52,7 @@ The sidebar gains one structural change: a second section, "Too few photos", lis
 
 ### Layer 1: The one thing
 
-**What she sees.** Under the camera name and a provenance line, above the report card, one card shows:
+**What he sees.** Under the camera name and a provenance line, above the report card, one card shows:
 - One sentence that starts with a verb.
 - One capsule (severity and evidence, with the photo count).
 - An effort label.
@@ -128,7 +128,7 @@ The same sentence appears as a "One thing" column in the Library table, as the `
 
 ### Layer 2: Your check (before and after)
 
-**What she sees.** Once she starts a check, a card sits directly under layer 1. It shows:
+**What he sees.** Once he starts a check, a card sits directly under layer 1. It shows:
 - The baseline share with its 95 % range.
 - The new photos counted so far (with a progress bar to the first look at 10).
 - Once there are 10 or more: the after share, the difference with its range, and a verdict in words.
@@ -139,11 +139,11 @@ The full design is in §5.
 
 **Question.** I changed how I shoot. Did it work?
 
-**Caveat it carries.** The rule is shown verbatim. Ten photos give only a first look, and a lower share can also mean different scenes (fewer white pages or screens). The photo strip lets her see which.
+**Caveat it carries.** The rule is shown verbatim. Ten photos give only a first look, and a lower share can also mean different scenes (fewer white pages or screens). The photo strip lets him see which.
 
 ### Layer 3: Report card with coverage lines
 
-**What she sees.**
+**What he sees.**
 - The six tiles stay: in-focus sharpness, noise, blown highlights, sharpening halo, colour lean, dynamic range.
 - Each tile's number is drawn by one `MeasuredValue` view, so a qualifier cannot be dropped.
 - Each tile ends in a caption that says what the median is a median of, what was left out, and the one caveat that matters.
@@ -194,7 +194,7 @@ The full design is in §5.
 
 ### Layer 4: Coaching cards (claim, proof, what to do)
 
-**What she sees.** Cards are sorted by severity, then evidence word. Each card has:
+**What he sees.** Cards are sorted by severity, then evidence word. Each card has:
 - **Header.** Severity symbol and title; at the trailing edge, the severity word and `EvidenceCapsule` ("Solid · 206 photos").
 - **Body.** The finding with numbers, then "Why" in `.secondary`.
 - **Actions.** "What to do", grouped under up to three effort headings: "At the camera", "Set up once", "In the editor". Thin cards say "Try this" instead.
@@ -301,7 +301,7 @@ Below the cards come three disclosures:
 
 ### Layer 5: Photo screen: Do first, Also, Checked
 
-**What she sees.** Order in the detail column:
+**What he sees.** Order in the detail column:
 1. The photo with its overlay picker and caption.
 2. File name and settings.
 3. Intent capsules (if any).
@@ -401,7 +401,7 @@ Also: Colour lean ("warm and green by 1.03 stops; your phone usually leans 0.17,
 
 ### Layer 6: How sure (tooltip, then popover, then Glossary "Method")
 
-**What she sees.**
+**What he sees.**
 1. Hovering a tile title or row label shows the one-line meaning (`.help`).
 2. The ⓘ popover has four blocks: **Meaning**, **What good looks like**, **How sure**, and **In this camera** or **In this photo**. A button, **Open the Glossary**, sits at the bottom.
 3. The Glossary window gains a **Method** tab next to Metrics. It holds:
@@ -433,7 +433,7 @@ Also: Colour lean ("warm and green by 1.03 stops; your phone usually leans 0.17,
 
 ### Layer 7: Library headline and sparse cameras
 
-**What she sees.**
+**What he sees.**
 - **Library.** The headline is rewritten, the table gains a "One thing" column, and the sharpness cell shows its count ("1,966 LW/PH · Fair (43)" or "Not enough photos (1)"). A provenance line names the file and when it was written.
 - **Sparse cameras.** A camera with fewer than 5 photos shows its photos' own figures (not medians), what is missing, the count needed, and a **Choose Photos to Analyze…** button. Its sidebar row sits under "Too few photos".
 
