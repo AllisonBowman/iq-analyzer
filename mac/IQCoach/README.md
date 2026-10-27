@@ -1,6 +1,6 @@
 # IQ Coach
 
-A macOS app (SwiftUI, Swift Charts, Swift Testing, macOS 15) that turns `results.json` from `python -m iqa analyze` into plain-language coaching: what each camera does well and badly, what to change when shooting, and what to do in Apple Photos, Lightroom or any editor to each photo. Each camera screen opens with the one change most worth making, with a word and a photo count for how sure it is; the photographer can mark a finding as intended or start a check that measures her next photos against a frozen baseline. Spec: `docs/APP-IQ-COACH-SPEC.md` (shipped behaviour) and `docs/FEEDBACK-LAYERS-SPEC.md` (the design of the feedback layers).
+A macOS app (SwiftUI, Swift Charts, Swift Testing, macOS 15) that turns `results.json` from `python -m iqa analyze` into plain-language coaching: what each camera does well and badly, what to change when shooting, and what to do in Apple Photos, Lightroom or any editor to each photo. Each camera screen opens with the one change most worth making, with a word and a photo count for how sure it is; the photographer can mark a finding as intended or start a check that measures his next photos against a frozen baseline. Spec: `docs/APP-IQ-COACH-SPEC.md` (shipped behaviour) and `docs/FEEDBACK-LAYERS-SPEC.md` (the design of the feedback layers).
 
 ## Build
 
