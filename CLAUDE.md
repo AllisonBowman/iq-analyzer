@@ -7,7 +7,7 @@ https://jobs.apple.com/en-us/details/200686669-0836/camera-and-photos-image-qual
 posted Sep 30 2026). The posting's minimum qualifications ask for automation built with coding
 harnesses like Claude Code, Python/MATLAB, photography knowledge, imaging-pipeline familiarity,
 and ISO image-quality metrics. This repo is the portfolio artifact that turns the one gap (ISO IQ
-metrics) into a demonstrated strength, measured on her own photographs. It was scaffolded
+metrics) into a demonstrated strength, measured on his own photographs. It was scaffolded
 overnight on 2026-10-13 by Claude from a cloud session; Claude Code on this Mac continues it.
 
 Keep that audience in mind: a camera-team engineer will read this code. Prefer correctness,
@@ -101,7 +101,7 @@ Not done yet:
 
 The morning run, the periodic-texture detector, `--no-paths` (the repo is public) and chart mode
 (ColorChecker dE00 + WB, e-SFR field map; synthetic validation only) are done, 2026-10-13.
-The bootstrap interval (her task 4) is done too; results.csv carries it. **IQ Coach**, the macOS
+The bootstrap interval (his task 4) is done too; results.csv carries it. **IQ Coach**, the macOS
 coaching app, is built under `mac/IQCoach/` (spec `docs/APP-IQ-COACH-SPEC.md`; 189 Swift tests as of 2026-10-23, after the feedback layers of
 `docs/FEEDBACK-LAYERS-SPEC.md`: the one thing per camera, evidence words, set-aside and intent tags, capture checks,
 Markdown exports;
