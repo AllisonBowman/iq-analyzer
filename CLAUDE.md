@@ -158,6 +158,20 @@ Code sandbox off).
 5. A one-page write-up with the three best charts, for the application and LinkedIn.
 6. Packaging (`pip install -e .`), CI running the tests, type hints clean under mypy.
 
+## Possible direction: a simple mobile app (idea only, not planned, do not build)
+
+Recorded 2026-11-10 from Allison's voice note of the same day, relayed through the Drive mailbox
+(his words as relayed, not a verbatim quote): the desktop analyzer is not terribly useful to him
+right now, but he can imagine a really simple mobile app that is given permission to see your
+photos, runs the same analyses on them, and regularly, maybe once a week, gives a report on how
+the cameras you are using are doing.
+
+Nothing is designed or scheduled. What already exists that such an app would lean on: the memory
+(measure each photo once, per-camera window, `docs/MEMORY-SPEC.md`) and IQ Coach's per-camera
+findings. What it would need that does not exist: the measurements running on the phone (the
+engine is Python with NumPy/SciPy/OpenCV; `docs/DISTRIBUTION-PLAN.md` section 1 item 3 already
+names a Swift port of the engine as the route to any store build).
+
 ## Conventions
 
 - Measurements on *linear* data for SFR (ISO 12233), on *display-referred* sRGB for noise and
