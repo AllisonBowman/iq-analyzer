@@ -6,6 +6,7 @@ import time
 
 from .edges import lw_per_ph, measure_natural_edges
 from .exposure import analyze_exposure
+from .fingerprint import dhash256
 from .imageio import LoadedImage, load_image
 from .noise import analyze_noise
 from .structure import analyze_structure, focus_split
@@ -15,7 +16,9 @@ META_KEYS = ("format", "camera_make", "camera_model", "lens", "iso", "exposure_s
 
 
 def analyze_loaded(img: LoadedImage, max_rois: int = 30) -> dict:
-    t0 = time.time()
+    # Monotonic wall time (time.time() counted system sleep: 22 library rows read 900-1,063 s) and
+    # process CPU time, which together say whether a slow photo was busy or waiting.
+    t0, c0 = time.perf_counter(), time.process_time()
     rec: dict = {"file": os.path.basename(img.path), "path": img.path, "is_raw": img.is_raw}
     for k in META_KEYS:
         rec[k] = img.meta.get(k)
@@ -45,7 +48,9 @@ def analyze_loaded(img: LoadedImage, max_rois: int = 30) -> dict:
     rec["mtf50_infocus_cpp"] = split["infocus_mtf50"] if split else float("nan")
     rec["mtf50_background_cpp"] = split["background_mtf50"] if split else float("nan")
     rec["infocus_edge_share"] = split["infocus_share"] if split else float("nan")
-    rec["analysis_s"] = round(time.time() - t0, 2)
+    rec["dhash256"] = dhash256(img.rgb8)      # advisory near-duplicate grouping only (iqa/fingerprint.py)
+    rec["analysis_s"] = round(time.perf_counter() - t0, 2)
+    rec["cpu_s"] = round(time.process_time() - c0, 2)
     rec["_edges"] = edges
     rec["_noise"] = noise
     return rec

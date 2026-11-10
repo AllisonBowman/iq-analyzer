@@ -31,9 +31,11 @@ struct OverlayImage: View {
 
     @State private var image: CGImage?
     @State private var mask: ClippingMask?
+    /// True once a load has returned without an image (the placeholder then says why).
+    @State private var gaveUp = false
     @Environment(\.isSnapshot) private var isSnapshot
 
-    static let loadPixel = 800
+    static let loadPixel = ClippingMask.previewPixel
 
     private var shownImage: CGImage? {
         guard let path else { return nil }
@@ -64,11 +66,11 @@ struct OverlayImage: View {
         .accessibilityAddTraits(.isImage)
         .task(id: path) {
             guard !isSnapshot else { return }
-            image = nil; mask = nil
+            image = nil; mask = nil; gaveUp = false
             guard let path else { return }
             if let hit = ThumbnailStore.cached(path: path, maxPixel: Self.loadPixel) { image = hit; return }
             let img = await ThumbnailStore.shared.image(path: path, maxPixel: Self.loadPixel)
-            if !Task.isCancelled { image = img }
+            if !Task.isCancelled { image = img; gaveUp = img == nil }
         }
         .task(id: "\(path ?? "")|\(overlay == .clipping)|\(image != nil)") {
             guard !isSnapshot, overlay == .clipping, let path, let img = image else { return }
@@ -83,19 +85,31 @@ struct OverlayImage: View {
     }
 
     private var placeholder: some View {
-        let s = boxSize ?? 160
+        let s = boxSize ?? 200
         return ZStack {
             RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.secondary.opacity(0.15))
             VStack(spacing: 6) {
                 Image(systemName: "photo").font(boxSize == nil ? .largeTitle : .title3).foregroundStyle(.secondary)
                 if boxSize == nil {
-                    Text(photo.path == nil ? "No file path in these results"
-                         : (FileManager.default.fileExists(atPath: photo.path ?? "") ? "Loading preview…" : "File not found at its recorded path"))
+                    Text(Self.placeholderText(path: photo.path, gaveUp: gaveUp, exists: { FileManager.default.fileExists(atPath: $0) },
+                                              isPreview: { PreviewStore.shared.files.sha(ofPreview: $0) != nil }))
                         .font(.caption).foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 16)
                 }
             }
         }
         .frame(maxWidth: boxSize ?? .infinity, minHeight: s, maxHeight: boxSize ?? s)
+    }
+
+    nonisolated static let previewNotKeptText = "The preview of this photo was not kept. One from your Photos library is rebuilt by itself while Photos has the original on this Mac; otherwise choose the photo again (Choose Photos…) to bring it back, which is also the way for a photo picked without access to your library. Its measurements are remembered either way."
+
+    /// What the large placeholder says: loading, no path, a preview that was not kept, or a moved file.
+    nonisolated static func placeholderText(path: String?, gaveUp: Bool, exists: (String) -> Bool, isPreview: (String) -> Bool) -> String {
+        guard let path else { return "No file path in these results" }
+        if isPreview(path) { return gaveUp && !exists(path) ? previewNotKeptText : "Loading preview…" }
+        return exists(path) ? "Loading preview…" : "File not found at its recorded path"
     }
 
     @ViewBuilder private var overlayLayer: some View {

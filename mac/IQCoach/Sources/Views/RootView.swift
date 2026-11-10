@@ -34,8 +34,10 @@ struct RootView: View {
                     .help("Open a results.json (⌘O)")
                 Button { model.isChoosingFolder = true } label: { Label("Analyze Folder…", systemImage: "folder.badge.gearshape") }
                     .help("Run the analyzer on a folder of photos (⇧⌘O)")
+                    .disabled(model.isBusy)
                 Button { model.isPickingPhotos = true } label: { Label("Choose Photos…", systemImage: "photo.on.rectangle.angled") }
                     .help("Pick up to \(AppModel.maxPickedPhotos) photos from your Photos library to analyze (⇧⌘P)")
+                    .disabled(model.isBusy)
                 if let cam = model.selectedCamera {
                     let prefs = model.preferences.prefs
                     let out = CoachingEngine.output(for: cam, prefs: prefs)
@@ -57,8 +59,11 @@ struct RootView: View {
             case .failure(let e): model.errorMessage = e.localizedDescription
             }
         }
+        // photoLibrary: .shared() gives each item its itemIdentifier where the system allows it: with library access a
+        // picked photo is read through PhotoKit as its original, and one the memory already knows is not downloaded.
         .photosPicker(isPresented: $model.isPickingPhotos, selection: $model.pickedPhotos,
-                      maxSelectionCount: AppModel.maxPickedPhotos, matching: .images, preferredItemEncoding: .current)
+                      maxSelectionCount: AppModel.maxPickedPhotos, matching: .images, preferredItemEncoding: .current,
+                      photoLibrary: .shared())
         .onChange(of: model.pickedPhotos) { _, items in model.analyze(picked: items) }
         .fileImporter(isPresented: $model.isChoosingFolder, allowedContentTypes: [.folder]) { result in
             if case .success(let url) = result { model.analyze(folder: url) }
@@ -70,6 +75,7 @@ struct RootView: View {
             Button("OK", role: .cancel) {}
         } message: { Text(model.errorMessage ?? "") }
         .task {
+            if !AppModel.isTestHost { await model.launch() }
             if let path = LaunchOptions.openPath { model.load(url: URL(fileURLWithPath: path)) }
             if let n = LaunchOptions.analyzePhotosCount { model.analyzeFromPhotos(count: n) }
             await WindowShots.runIfRequested(model: model)
@@ -148,7 +154,9 @@ struct EmptyStateView: View {
             Button("Open Results…") { model.isImporting = true }
                 .buttonStyle(.borderedProminent)
             Button("Analyze Folder…") { model.isChoosingFolder = true }
+                .disabled(model.isBusy)
             Button("Choose Photos to Analyze…") { model.isPickingPhotos = true }
+                .disabled(model.isBusy)
         }
         .padding(24)
     }
@@ -159,9 +167,12 @@ struct AnalysisSheet: View {
     var body: some View {
         let p = model.progress ?? AnalysisProgress()
         VStack(alignment: .leading, spacing: 16) {
-            Text(p.failure == nil ? "Analyzing photos" : "The analysis did not finish").font(.title2.weight(.semibold))
+            Text(p.failure != nil ? "The analysis did not finish" : (p.finished ? "Analysis finished" : "Analyzing photos"))
+                .font(.title2.weight(.semibold))
             if let failure = p.failure {
                 Label(failure, systemImage: "exclamationmark.triangle").fixedSize(horizontal: false, vertical: true)
+            } else if p.finished {
+                Label(p.summary ?? "Done.", systemImage: "checkmark.circle").fixedSize(horizontal: false, vertical: true)
             } else if p.total > 0 {
                 ProgressView(value: Double(p.done), total: Double(p.total)) {
                     Text("\(p.done.formatted()) of \(p.total.formatted()) photos")
@@ -182,8 +193,13 @@ struct AnalysisSheet: View {
             .background(.fill.quaternary, in: RoundedRectangle(cornerRadius: 8))
             HStack {
                 Spacer()
-                Button(p.failure == nil ? "Cancel" : "Close", role: .cancel) { model.cancelAnalysis() }
-                    .keyboardShortcut(.cancelAction)
+                if p.finished && p.failure == nil {
+                    Button("Done") { model.cancelAnalysis() }
+                        .keyboardShortcut(.defaultAction)
+                } else {
+                    Button(p.failure == nil ? "Cancel" : "Close", role: .cancel) { model.cancelAnalysis() }
+                        .keyboardShortcut(.cancelAction)
+                }
             }
         }
         .padding(24)

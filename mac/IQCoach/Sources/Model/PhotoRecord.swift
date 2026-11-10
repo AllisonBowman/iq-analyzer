@@ -68,6 +68,14 @@ struct PhotoRecord: Codable, Identifiable, Sendable, Hashable {
     var mtf50InfocusCPP: Double? = nil
     var mtf50BackgroundCPP: Double? = nil
     var infocusEdgeShare: Double? = nil
+    // The memory (docs/MEMORY-SPEC.md §3): the content id (SHA-256 of the file's bytes, 64 hex), the analyzer key it
+    // was measured with, and the tier it was read from ("record", or "ledger" for a photo that left the window).
+    var sha256: String? = nil
+    var analyzerKey: String? = nil
+    var memoryTier: String? = nil
+    /// Not coded: set by `decodeAll` on the second and later rows of one content in a results.json (byte-identical
+    /// copies in a folder), so every row keeps its own identity. Memory rows are one per content and keep the sha.
+    var rowID: String? = nil
 
     enum CodingKeys: String, CodingKey {
         case file, path, lens, iso, width, height, format, datetime, colorfulness
@@ -124,9 +132,13 @@ struct PhotoRecord: Codable, Identifiable, Sendable, Hashable {
         case mtf50InfocusCPP = "mtf50_infocus_cpp"
         case mtf50BackgroundCPP = "mtf50_background_cpp"
         case infocusEdgeShare = "infocus_edge_share"
+        case sha256
+        case analyzerKey = "analyzer_key"
+        case memoryTier = "memory_tier"
     }
 
-    var id: String { path ?? file }
+    /// The content id when there is one, so two IMG_0001.JPG from different cameras no longer collide.
+    var id: String { rowID ?? sha256 ?? path ?? file }
 }
 
 extension PhotoRecord {
@@ -186,6 +198,9 @@ extension PhotoRecord {
         clipGamutPct = num(.clipGamutPct)
         edgesCandidates = int(.edgesCandidates)
         edgesRejectReasons = str(.edgesRejectReasons)
+        sha256 = str(.sha256).flatMap { $0.isEmpty ? nil : $0.lowercased() }
+        analyzerKey = str(.analyzerKey)
+        memoryTier = str(.memoryTier)
     }
 }
 
@@ -299,8 +314,18 @@ extension PhotoRecord {
         return d
     }
 
+    /// The rows of a results.json. A content (or path, or name) that repeats gets a row id on each later copy, so
+    /// Table selection and ForEach never see one identity twice; the first copy keeps the content id.
     static func decodeAll(from data: Data) throws -> [PhotoRecord] {
-        try makeDecoder().decode([PhotoRecord].self, from: data)
+        var rows = try makeDecoder().decode([PhotoRecord].self, from: data)
+        var seen: [String: Int] = [:]
+        for i in rows.indices {
+            let base = rows[i].sha256 ?? rows[i].path ?? rows[i].file
+            let n = seen[base, default: 0]
+            seen[base] = n + 1
+            if n > 0 { rows[i].rowID = "\(base)|\(rows[i].path ?? rows[i].file)|\(n)" }
+        }
+        return rows
     }
 }
 

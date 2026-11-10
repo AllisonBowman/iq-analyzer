@@ -1,10 +1,13 @@
 import CoreGraphics
 import Foundation
+import ImageIO
 
 /// Where a picture is clipped: pixels at or above 254 in any channel (blown) and at or below 1 in all channels (crushed).
 struct ClippingMask: @unchecked Sendable {
     static let highThreshold: UInt8 = 254
     static let lowThreshold: UInt8 = 1
+    /// The long side of the thumbnail a mask is drawn on (OverlayImage.loadPixel).
+    static let previewPixel = 800
 
     /// A tint image the size of the source: opaque red on blown pixels, opaque blue on crushed ones, clear elsewhere.
     let image: CGImage
@@ -58,22 +61,67 @@ struct ClippingMask: @unchecked Sendable {
                                 shouldInterpolate: false, intent: .defaultIntent) else { return nil }
         return ClippingMask(image: img, width: w, height: h, highCount: result.high, lowCount: result.low)
     }
+
+    /// Reads a mask written as PNG by the preview store and recounts its pixels: opaque red is blown, opaque blue
+    /// crushed. PNG is lossless, so the counts and the tint are those of the mask that was written.
+    static func load(png url: URL) -> ClippingMask? {
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let img = CGImageSourceCreateImageAtIndex(src, 0, nil),
+              let space = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
+        let w = img.width, h = img.height
+        guard w > 0, h > 0 else { return nil }
+        var rgba = [UInt8](repeating: 0, count: w * h * 4)
+        let drawn = rgba.withUnsafeMutableBytes { buf -> Bool in
+            guard let ctx = CGContext(data: buf.baseAddress, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                      space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            ctx.draw(img, in: CGRect(x: 0, y: 0, width: w, height: h))
+            return true
+        }
+        guard drawn else { return nil }
+        var high = 0, low = 0
+        for i in 0..<(w * h) where rgba[i * 4 + 3] == 255 {
+            if rgba[i * 4] == 255 && rgba[i * 4 + 2] == 0 { high += 1 } else if rgba[i * 4 + 2] == 255 && rgba[i * 4] == 0 { low += 1 }
+        }
+        return ClippingMask(image: img, width: w, height: h, highCount: high, lowCount: low)
+    }
+
+    /// Bytes the decoded tint occupies, the cache cost.
+    var cost: Int { image.bytesPerRow * image.height }
 }
 
-/// Builds clipping masks off the main thread and remembers them per path.
+/// Builds clipping masks off the main thread and remembers them per path in a byte-bounded cache. For a preview
+/// with a stored `<sha>.mask.png` (computed from the original, not the lossy preview) that mask is used.
 actor ClippingMaskStore {
     static let shared = ClippingMaskStore()
-    private var cache: [String: ClippingMask] = [:]
+    static let costLimit = 32 * 1024 * 1024
+
+    private final class Box: Sendable {
+        let mask: ClippingMask
+        init(_ m: ClippingMask) { mask = m }
+    }
+
+    private let cache: NSCache<NSString, Box> = {
+        let c = NSCache<NSString, Box>()
+        c.totalCostLimit = ClippingMaskStore.costLimit
+        return c
+    }()
     private var inflight: [String: Task<ClippingMask?, Never>] = [:]
+    private let previews: PreviewFiles
+
+    init(previews: PreviewFiles = PreviewStore.shared.files) { self.previews = previews }
 
     func mask(path: String, source: CGImage) async -> ClippingMask? {
-        if let hit = cache[path] { return hit }
+        if let hit = cache.object(forKey: path as NSString) { return hit.mask }
         if let running = inflight[path] { return await running.value }
-        let task = Task.detached(priority: .userInitiated) { ClippingMask.make(from: source) }
+        let stored = previews.sha(ofPreview: path).map(previews.mask).flatMap { FileManager.default.fileExists(atPath: $0.path) ? $0 : nil }
+        let task = Task.detached(priority: .userInitiated) { () -> ClippingMask? in
+            if let stored, let m = ClippingMask.load(png: stored) { return m }
+            return ClippingMask.make(from: source)
+        }
         inflight[path] = task
         let result = await task.value
         inflight[path] = nil
-        if let result { cache[path] = result }
+        if let result { cache.setObject(Box(result), forKey: path as NSString, cost: result.cost) }
         return result
     }
 }

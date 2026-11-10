@@ -9,6 +9,8 @@ struct CameraReportView: View {
     /// Preferences to use instead of the app's (snapshots and fixtures).
     var prefsOverride: UserPreferences?
     var choosePhotos: (() -> Void)?
+    /// The day freshness is measured to (fixtures pin it).
+    var now: Date = .now
     @Environment(AppModel.self) private var model: AppModel?
     @State private var settingAside: Insight?
     @State private var startingCheck: Insight?
@@ -27,6 +29,10 @@ struct CameraReportView: View {
         ScrollViewReader { proxy in
             MaybeScroll {
                 VStack(alignment: .leading, spacing: 32) {
+                    if let banner = CameraFreshness.banner(camera: camera.model, lastDate: s.lastDate, now: now),
+                       let state = CameraFreshness(lastDate: s.lastDate, now: now) {
+                        FreshnessBanner(state: state, text: banner)
+                    }
                     header
                     if isSparse {
                         sparseBody
@@ -65,6 +71,16 @@ struct CameraReportView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(camera.model).font(.largeTitle.weight(.bold)).accessibilityAddTraits(.isHeader)
             Text(provenance).font(.callout).foregroundStyle(.secondary)
+            // Only beside the memory's own window: beside a results.json opened from a file, the archive is neither
+            // "earlier" nor a different set of photos.
+            if model?.isShowingMemory == true, let earlier = model?.memory?.archiveSummary(camera: camera.model, currentKey: model?.currentAnalyzerKey) {
+                Text(earlier.sentence + ".").font(.callout).foregroundStyle(.secondary).monospacedDigit()
+                    .fixedSize(horizontal: false, vertical: true)
+                    .help("From the monthly summaries of the photos that left the newest \(model?.memory?.window ?? MemorySnapshot.defaultWindow); the coaching reads only the newest.")
+                if let left = earlier.leftOutSentence {
+                    Text(left).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+            }
             let names = CameraRules.lensNames(camera.lenses)
             let lensText = camera.lenses.map { camera.isPhone ? (names[$0.name] ?? $0.name) : $0.name }.joined(separator: ", ")
             Text("\(Fmt.count(camera.lenses.count, "lens")): \(lensText)")
@@ -155,7 +171,7 @@ struct CameraReportView: View {
             } description: {
                 Text("This camera has \(Fmt.count(camera.photos.count, "photo")). Medians and coaching need \(CameraRules.minPhotos).")
             } actions: {
-                if let choosePhotos { Button("Choose Photos to Analyze…", action: choosePhotos) }
+                if let choosePhotos { Button("Choose Photos to Analyze…", action: choosePhotos).disabled(model?.isBusy == true) }
             }
         }
     }
@@ -211,5 +227,27 @@ struct RecentPhotoStrip: View {
             }
             if isSnapshot { strip } else { ScrollView(.horizontal, showsIndicators: false) { strip } }
         }
+    }
+}
+
+/// The sentence a Resting or Dormant camera's screen opens with (spec §8 item 1).
+struct FreshnessBanner: View {
+    let state: CameraFreshness
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: state == .dormant ? "moon.zzz.fill" : "moon.zzz")
+                .font(.title2).foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(state.word) camera").font(.headline)
+                Text(text).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.fill.quaternary, in: RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .combine)
     }
 }

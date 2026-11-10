@@ -9,8 +9,6 @@ from datetime import datetime
 
 import numpy as np
 
-from .noise import PERIODIC_PEAK_THRESHOLD, WHITENESS_HEAVY, WHITENESS_SMOOTHED
-
 # How each rejection reason in ``edges_reject_reasons`` reads in the report.
 REJECT_REASON_LABELS = {
     "plateau_noise": "plateau too noisy", "error": "SFR failed", "clipped": "clipped",
@@ -41,7 +39,8 @@ CSV_COLUMNS = [
     "dr_snr1_lower_bound", "dr_snr2_lower_bound", "dr_snr4_lower_bound", "dr_snr10_lower_bound",
     "clip_high_pct", "clip_low_pct", "clip_gamut_pct", "mean_luma", "luma_p1", "luma_p50", "luma_p99",
     "tonal_range_stops", "colorfulness", "wb_r_over_g", "wb_b_over_g", "wb_r_over_g_stops",
-    "wb_b_over_g_stops", "saturation_mean", "analysis_s", "path",
+    "wb_b_over_g_stops", "saturation_mean", "analysis_s", "cpu_s", "dhash256", "sha256", "analyzer_key",
+    "memory_tier", "path",
 ]
 
 
@@ -70,21 +69,29 @@ def write_csv(records: list[dict], path: str) -> None:
             w.writerow({k: _fmt(r.get(k)) for k in CSV_COLUMNS})
 
 
+def detail_dict(r: dict) -> dict:
+    """The per-edge list and the noise curve of a freshly analysed record, as results.json and the
+    memory's detail tier carry them; empty for a record read back from JSON."""
+    d: dict = {}
+    edges = r.get("_edges")
+    if edges is not None:
+        d["edges"] = [e.as_dict() for e in edges.edges]
+    noise = r.get("_noise")
+    if noise is not None and noise.bin_centers.size:
+        d["noise_curve"] = {
+            "luma_8bit": noise.bin_centers.tolist(),
+            "luma_noise_8bit": noise.luma_noise.tolist(),
+            "chroma_noise_8bit": noise.chroma_noise.tolist(),
+            "patches": noise.bin_counts.tolist(),
+        }
+    return d
+
+
 def write_json(records: list[dict], path: str) -> None:
     clean = []
     for r in records:
         d = {k: v for k, v in r.items() if not k.startswith("_")}
-        edges = r.get("_edges")
-        if edges is not None:
-            d["edges"] = [e.as_dict() for e in edges.edges]
-        noise = r.get("_noise")
-        if noise is not None and noise.bin_centers.size:
-            d["noise_curve"] = {
-                "luma_8bit": noise.bin_centers.tolist(),
-                "luma_noise_8bit": noise.luma_noise.tolist(),
-                "chroma_noise_8bit": noise.chroma_noise.tolist(),
-                "patches": noise.bin_counts.tolist(),
-            }
+        d.update(detail_dict(r))
         clean.append(d)
 
     def default(o):
@@ -96,6 +103,21 @@ def write_json(records: list[dict], path: str) -> None:
 
     with open(path, "w") as fh:
         json.dump(clean, fh, indent=1, default=default, allow_nan=True)
+
+
+def rehydrate(records: list[dict]) -> list[dict]:
+    """Rebuild the noise curve that the charts read from a record's stored ``noise_curve`` (a
+    results.json row or a remembered record), in place. ``noise_curve`` and ``edges`` stay on the
+    record, so write_json writes them back unchanged."""
+    from .noise import NoiseResult
+    for r in records:
+        nc = r.get("noise_curve")
+        if nc and r.get("_noise") is None:
+            n = NoiseResult(n_patches=r.get("noise_patches", 0))
+            n.bin_centers = np.array(nc["luma_8bit"]); n.luma_noise = np.array(nc["luma_noise_8bit"])
+            n.chroma_noise = np.array(nc["chroma_noise_8bit"]); n.bin_counts = np.array(nc["patches"])
+            r["_noise"] = n
+    return records
 
 
 def _finite(records, key):
@@ -265,6 +287,9 @@ def _top(records, key, n=5, reverse=True, fmt="{:.3f}"):
 
 
 def write_markdown(records: list[dict], charts: list[str], path: str, title: str = "Image quality report") -> None:
+    # Imported here, not at the top: iqa.noise loads OpenCV, which writing results.json and
+    # results.csv from remembered records does not need.
+    from .noise import PERIODIC_PEAK_THRESHOLD, WHITENESS_HEAVY, WHITENESS_SMOOTHED
     n = len(records)
     with_edges = [r for r in records if r.get("edges_measured")]
     lines = [f"# {title}", "", f"Generated {datetime.now():%Y-%m-%d %H:%M} by iqa on {n} images.", ""]

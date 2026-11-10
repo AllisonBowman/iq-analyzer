@@ -6,7 +6,7 @@ with CSV/JSON output, charts and a markdown report. Reads RAW (CR2/NEF/ARW/DNG/R
 JPEG, HEIC, PNG and TIFF.
 
 Built to be checked, not just plausible: every measurement is validated against synthetic
-images with known ground truth (`tests/`, 116 tests), `iqa demo` reproduces that check end to
+images with known ground truth (`tests/`, 174 tests), `iqa demo` reproduces that check end to
 end, and the tool reports what it could *not* measure (clipped or shaded edges, extrapolated
 noise levels, dynamic-range lower bounds) instead of printing a number anyway. A first
 adversarial review by a separate Claude Code session (`REVIEW.md`) found 13 correctness issues
@@ -18,7 +18,7 @@ the methodology caveats are stated in the report's "How to read these numbers".
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python -m pytest -q                      # 116 tests: SFR vs analytic MTF (with pixel aperture), noise vs injected sigma, CIEDE2000 vs the published pairs, synthetic charts, adversarial cases
+python -m pytest -q                      # 174 tests: SFR vs analytic MTF (with pixel aperture), noise vs injected sigma, CIEDE2000 vs the published pairs, synthetic charts, adversarial cases
 python -m iqa demo --out results_demo    # synthetic scenes with known blur/noise, analysed end to end
 python -m iqa analyze ~/Pictures/export --out results --sample 60 -r
 open results/report.md
@@ -36,6 +36,30 @@ Chart mode: a photograph of a ColorChecker Classic and/or an e-SFR chart of slan
 ```bash
 python -m iqa chart chart_shot.heic --plot chart.png --json chart.json
 ```
+
+### The memory: measure each photo once
+
+`--memory` remembers every photo by the SHA-256 of its bytes, in one SQLite file, so a photo is
+never measured twice and a re-run of photos already seen costs a hash and a lookup instead of a
+measurement. On the 93 copies earlier app runs had left (50 distinct photos), the first run measured
+the 50 and recognised the other 43 as byte-identical in 298 s; the second run took 2.2 s and imported
+no OpenCV, SciPy or matplotlib:
+
+```bash
+python -m iqa analyze ~/Pictures/export -r --out results --memory memory.sqlite
+python -m iqa memory stats memory.sqlite        # what is remembered, per tier and per camera
+python -m iqa memory export memory.sqlite --out window.json && python -m iqa report window.json
+```
+
+Only exact bytes plus the current analyzer key (`MEASUREMENT_VERSION` and the settings that change
+results) let a stored measurement be reused; no perceptual hash, name, size or date ever does,
+because a perceptual match says "same picture" precisely when the IQ numbers differ (a slight blur
+moved MTF50 by 18 % at dHash distance 0-1). Disk stays bounded as the library grows: each camera
+keeps its newest 500 photos as full records (the window the coach advises from); older ones are
+folded into fixed-size monthly histograms with exact counts, and only the ledger (content id,
+capture time, status, five headline figures) grows with the number of photos. The design is
+`docs/MEMORY-SPEC.md`, the evidence behind it (costs measured on this Mac, a perceptual-hash
+benchmark on real photos, cited methods) is `docs/MEMORY-RESEARCH.md`.
 
 ## What it measures
 
@@ -81,12 +105,14 @@ iqa/exposure.py  clipping and colour statistics
 iqa/color.py     ColorChecker detection, CIEDE2000, white-balance error
 iqa/chart_sfr.py e-SFR chart (slanted squares) sharpness across the field
 iqa/analyze.py   one image -> flat record
+iqa/memory.py    the memory: content ids, ledger, window, archive, compaction (schema: memory_schema.sql)
+iqa/fingerprint.py  dHash256, an advisory near-duplicate hash (never a reason to skip a measurement)
 iqa/report.py    CSV, JSON, charts, report.md
-iqa/cli.py       `python -m iqa analyze | sfr | chart | report | demo`
+iqa/cli.py       `python -m iqa analyze | sfr | chart | report | demo | memory`
 iqa/synth.py     synthetic ground-truth images (edges, scenes, both charts)
 media/           the narrated explainer video generator
-mac/IQCoach/     the macOS coaching app (SwiftUI; 77 tests)
-tests/           116 tests (test_adversarial.py pins the review's findings)
+mac/IQCoach/     the macOS coaching app (SwiftUI; 286 tests)
+tests/           174 tests (test_adversarial.py pins the review's findings; test_memory.py the memory's)
 ```
 
 ## License
